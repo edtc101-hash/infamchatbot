@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" fill="#ffffff" rx="20"/>
+  <!-- Factory building shape -->
+  <path d="M30 150 L30 80 L60 55 L60 80 L90 55 L90 80 L120 55 L120 80 L150 55 L150 80 L170 80 L170 150 Z" fill="#00FF00"/>
+  <!-- Door cutout -->
+  <rect x="55" y="115" width="30" height="35" fill="#ffffff"/>
+  <!-- InFam text -->
+  <text x="100" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="28" fill="#000000">InFam.</text>
+</svg>

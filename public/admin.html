@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인팸 관리자 | Q&A 편집</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --surface: #1e293b;
+            --surface2: #273549;
+            --border: rgba(255, 255, 255, 0.08);
+            --gold: #c9a96e;
+            --gold-light: #f0d5a0;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warn: #f59e0b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: var(--primary);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ===== 로그인 화면 ===== */
+        #loginScreen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: radial-gradient(ellipse at top, rgba(201, 169, 110, 0.15), transparent 60%),
+                radial-gradient(ellipse at bottom, rgba(59, 130, 246, 0.1), transparent 60%),
+                var(--primary);
+        }
+
+        .login-card {
+            background: var(--surface);
+            border: 1px solid rgba(201, 169, 110, 0.2);
+            border-radius: 24px;
+            padding: 48px;
+            width: 380px;
+            text-align: center;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+        }
+
+        .login-logo {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #c9a96e, #f0d5a0);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 0 auto 20px;
+            box-shadow: 0 0 40px rgba(201, 169, 110, 0.4);
+        }
+
+        .login-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .login-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 15px;
+            outline: none;
+            margin-bottom: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .login-input:focus {
+            border-color: rgba(201, 169, 110, 0.4);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #c9a96e, #f0d5a0);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: var(--primary);
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(201, 169, 110, 0.4);
+        }
+
+        .login-error {
+            color: #ef4444;
+            font-size: 13px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        /* ===== 메인 관리자 레이아웃 ===== */
+        #adminApp {
+            display: none;
+            min-height: 100vh;
+        }
+
+        /* 헤더 */
+        .admin-header {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .admin-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .admin-brand-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #c9a96e, #f0d5a0);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 13px;
+            color: var(--primary);
+        }
+
+        .admin-brand-name {
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .admin-brand-badge {
+            background: rgba(201, 169, 110, 0.15);
+            border: 1px solid rgba(201, 169, 110, 0.2);
+            color: var(--gold);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-link {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .header-link:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: var(--radius-sm);
+            color: #ef4444;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        /* 메인 콘텐츠 */
+        .admin-main {
+            padding: 32px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* 통계 카드 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: rgba(201, 169, 110, 0.2);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 800;
+        }
+
+        .stat-value.gold {
+            background: linear-gradient(135deg, #c9a96e, #f0d5a0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-value.green {
+            color: #10b981;
+        }
+
+        .stat-value.red {
+            color: #ef4444;
+        }
+
+        .stat-value.blue {
+            color: #3b82f6;
+        }
+
+        /* 도구 모음 */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-box:focus {
+            border-color: rgba(201, 169, 110, 0.4);
+        }
+
+        .search-box::placeholder {
+            color: var(--text-muted);
+        }
+
+        .filter-select {
+            padding: 10px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #c9a96e, #f0d5a0);
+            color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(201, 169, 110, 0.3);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+
+        .btn-success {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* FAQ 테이블 */
+        .faq-table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .table-title {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .table-count {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            transition: background 0.15s;
+        }
+
+        tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        td {
+            padding: 14px 16px;
+            font-size: 14px;
+            vertical-align: top;
+        }
+
+        .category-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .cat-제품 {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+        }
+
+        .cat-시공 {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+
+        .cat-배송 {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+
+        .cat-결제 {
+            background: rgba(139, 92, 246, 0.15);
+            color: #8b5cf6;
+        }
+
+        .cat-쇼룸 {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        .question-text {
+            max-width: 280px;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .answer-preview {
+            max-width: 340px;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.4;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .keywords-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            max-width: 160px;
+        }
+
+        .keyword-tag {
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            display: none;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 11px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            left: 3px;
+            top: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        input:checked+.toggle-slider {
+            background: #10b981;
+        }
+
+        input:checked+.toggle-slider::before {
+            transform: translateX(18px);
+        }
+
+        .actions-cell {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        /* 빈 상태 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .empty-desc {
+            font-size: 14px;
+        }
+
+        /* ===== 모달 ===== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 20px;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid rgba(201, 169, 110, 0.2);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 680px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6);
+            animation: modal-in 0.25s ease;
+        }
+
+        @keyframes modal-in {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 24px 28px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        .modal-body {
+            padding: 24px 28px;
+        }
+
+        .modal-footer {
+            padding: 16px 28px 24px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .form-label span {
+            color: #ef4444;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            border-color: rgba(201, 169, 110, 0.4);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 120px;
+            line-height: 1.6;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        /* 삭제 확인 모달 */
+        .confirm-modal {
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .confirm-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .confirm-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .confirm-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* 토스트 */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 999;
+        }
+
+        .toast {
+            padding: 14px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: toast-in 0.3s ease;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+            min-width: 260px;
+        }
+
+        .toast-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .toast-error {
+            background: #ef4444;
+            color: white;
+        }
+
+        .toast-info {
+            background: var(--accent);
+            color: white;
+        }
+
+        @keyframes toast-in {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* 로딩 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(201, 169, 110, 0.2);
+            border-top-color: #c9a96e;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 12px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .admin-main {
+                padding: 16px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            thead th,
+            td {
+                padding: 8px 10px;
+            }
+
+            .answer-preview,
+            .keywords-wrap {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 로그인 화면 -->
+    <div id="loginScreen">
+        <div class="login-card">
+            <div class="login-logo">IF</div>
+            <h1 class="login-title">관리자 로그인</h1>
+            <p class="login-sub">인팸 챗봇 Q&A 관리 시스템</p>
+            <input type="password" id="loginPassword" class="login-input" placeholder="비밀번호를 입력하세요"
+                onkeydown="if(event.key==='Enter') login()">
+            <button class="login-btn" onclick="login()">로그인</button>
+            <p class="login-error" id="loginError">비밀번호가 올바르지 않습니다.</p>
+        </div>
+    </div>
+
+    <!-- 관리자 앱 -->
+    <div id="adminApp">
+        <!-- 헤더 -->
+        <header class="admin-header">
+            <div class="admin-brand">
+                <div class="admin-brand-icon">IF</div>
+                <span class="admin-brand-name">인팸 관리자</span>
+                <span class="admin-brand-badge">Q&A 관리</span>
+            </div>
+            <div class="header-actions">
+                <a href="/" class="header-link">← 챗봇 보기</a>
+                <button class="logout-btn" onclick="logout()">로그아웃</button>
+            </div>
+        </header>
+
+        <main class="admin-main">
+            <!-- 통계 -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-label">전체 Q&A</div>
+                    <div class="stat-value gold" id="statTotal">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">활성</div>
+                    <div class="stat-value green" id="statEnabled">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">비활성</div>
+                    <div class="stat-value red" id="statDisabled">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">카테고리</div>
+                    <div class="stat-value blue" id="statCats">—</div>
+                </div>
+            </div>
+
+            <!-- 도구 모음 -->
+            <div class="toolbar">
+                <input type="text" id="searchBox" class="search-box" placeholder="🔍  질문 또는 답변 검색..."
+                    oninput="debounceSearch()" />
+                <select id="categoryFilter" class="filter-select" onchange="loadFAQs()">
+                    <option value="all">전체 카테고리</option>
+                    <option value="제품">제품</option>
+                    <option value="시공">시공</option>
+                    <option value="배송">배송</option>
+                    <option value="결제">결제</option>
+                    <option value="쇼룸">쇼룸</option>
+                </select>
+                <button class="btn btn-primary" onclick="openAddModal()">+ 새 Q&A 추가</button>
+            </div>
+
+            <!-- FAQ 테이블 -->
+            <div class="faq-table-wrap">
+                <div class="table-header">
+                    <span class="table-title">📋 Q&A 목록</span>
+                    <span class="table-count" id="tableCount">로딩 중...</span>
+                </div>
+                <div id="tableBody">
+                    <div class="loading">
+                        <div class="spinner"></div><br>불러오는 중...
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 추가/수정 모달 -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">새 Q&A 추가</h2>
+                <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">카테고리 <span>*</span></label>
+                        <select id="editCategory" class="form-select">
+                            <option value="제품">제품</option>
+                            <option value="시공">시공</option>
+                            <option value="배송">배송</option>
+                            <option value="결제">결제</option>
+                            <option value="쇼룸">쇼룸</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">활성화</label>
+                        <select id="editEnabled" class="form-select">
+                            <option value="true">✅ 활성</option>
+                            <option value="false">❌ 비활성</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">질문 <span>*</span></label>
+                    <input type="text" id="editQuestion" class="form-input" placeholder="고객이 물어볼 질문을 입력하세요">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">키워드 (쉼표로 구분)</label>
+                    <input type="text" id="editKeywords" class="form-input" placeholder="예: 배송, 택배, 운송, 언제">
+                    <p class="form-hint">💡 키워드가 많을수록 더 정확하게 매칭됩니다</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">답변 <span>*</span></label>
+                    <textarea id="editAnswer" class="form-textarea" rows="7"
+                        placeholder="답변을 입력하세요. **텍스트**로 강조, https://... 링크자동 변환됩니다."></textarea>
+                    <p class="form-hint">💡 **굵게**, 줄바꿈 가능합니다</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" style="background:rgba(255,255,255,0.05);color:var(--text-muted)"
+                    onclick="closeModal('editModal')">취소</button>
+                <button class="btn btn-primary" onclick="saveFAQ()">💾 저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 삭제 확인 모달 -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal confirm-modal">
+            <div class="modal-body" style="padding: 40px 32px 20px">
+                <div class="confirm-icon">🗑️</div>
+                <div class="confirm-title">Q&A를 삭제할까요?</div>
+                <p class="confirm-desc" id="deleteDesc">이 항목을 삭제하면 복구할 수 없습니다.</p>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button class="btn" style="background:rgba(255,255,255,0.05);color:var(--text-muted)"
+                    onclick="closeModal('deleteModal')">취소</button>
+                <button class="btn btn-danger" onclick="confirmDelete()">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        let authToken = '';
+        let allFAQs = [];
+        let deleteTargetId = '';
+        let searchTimer = null;
+
+        // ===== 로그인 =====
+        async function login() {
+            const pw = document.getElementById('loginPassword').value;
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pw })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    authToken = data.token;
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('adminApp').style.display = 'block';
+                    loadStats();
+                    loadFAQs();
+                } else {
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch (e) {
+                showToast('서버 연결 오류', 'error');
+            }
+        }
+
+        function logout() {
+            authToken = '';
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('adminApp').style.display = 'none';
+            document.getElementById('loginPassword').value = '';
+        }
+
+        // ===== 통계 로드 =====
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/admin/stats', { headers: { Authorization: 'Bearer ' + authToken } });
+                const data = await res.json();
+                document.getElementById('statTotal').textContent = data.total;
+                document.getElementById('statEnabled').textContent = data.enabled;
+                document.getElementById('statDisabled').textContent = data.disabled;
+                document.getElementById('statCats').textContent = Object.keys(data.categories).length;
+            } catch (e) { console.error(e); }
+        }
+
+        // ===== FAQ 목록 로드 =====
+        async function loadFAQs() {
+            const search = document.getElementById('searchBox').value;
+            const category = document.getElementById('categoryFilter').value;
+
+            document.getElementById('tableBody').innerHTML = '<div class="loading"><div class="spinner"></div><br>불러오는 중...</div>';
+
+            try {
+                const params = new URLSearchParams();
+                if (search) params.set('search', search);
+                if (category !== 'all') params.set('category', category);
+
+                const res = await fetch('/api/admin/faq?' + params, { headers: { Authorization: 'Bearer ' + authToken } });
+                const { data, total } = await res.json();
+                allFAQs = data;
+
+                document.getElementById('tableCount').textContent = `총 ${total}개 항목`;
+                renderTable(data);
+            } catch (e) {
+                document.getElementById('tableBody').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">로드 실패</div></div>';
+            }
+        }
+
+        function debounceSearch() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(loadFAQs, 400);
+        }
+
+        // ===== 테이블 렌더링 =====
+        function renderTable(data) {
+            if (data.length === 0) {
+                document.getElementById('tableBody').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <div class="empty-title">Q&A가 없습니다</div>
+        <div class="empty-desc">새 Q&A를 추가해보세요</div>
+      </div>`;
+                return;
+            }
+
+            const rows = data.map(faq => `
+    <tr>
+      <td><span class="category-badge cat-${faq.category}">${faq.category}</span></td>
+      <td><div class="question-text">${escapeHtml(faq.question)}</div></td>
+      <td><div class="answer-preview">${escapeHtml(faq.answer)}</div></td>
+      <td>
+        <div class="keywords-wrap">
+          ${(faq.keywords || []).slice(0, 4).map(k => `<span class="keyword-tag">${escapeHtml(k)}</span>`).join('')}
+          ${(faq.keywords || []).length > 4 ? `<span class="keyword-tag">+${faq.keywords.length - 4}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <label class="toggle-switch">
+          <input type="checkbox" ${faq.enabled !== false ? 'checked' : ''} onchange="toggleFAQ('${faq.id}', this)">
+          <span class="toggle-slider"></span>
+        </label>
+      </td>
+      <td>
+        <div class="actions-cell">
+          <button class="btn btn-sm btn-success" onclick="openEditModal('${faq.id}')">수정</button>
+          <button class="btn btn-sm btn-danger" onclick="openDeleteModal('${faq.id}', \`${escapeHtml(faq.question)}\`)">삭제</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+            document.getElementById('tableBody').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>카테고리</th>
+          <th>질문</th>
+          <th>답변 미리보기</th>
+          <th>키워드</th>
+          <th>활성</th>
+          <th>작업</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+        }
+
+        // ===== FAQ 추가 =====
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = '새 Q&A 추가';
+            document.getElementById('editId').value = '';
+            document.getElementById('editCategory').value = '제품';
+            document.getElementById('editEnabled').value = 'true';
+            document.getElementById('editQuestion').value = '';
+            document.getElementById('editKeywords').value = '';
+            document.getElementById('editAnswer').value = '';
+            openModal('editModal');
+        }
+
+        // ===== FAQ 수정 =====
+        function openEditModal(id) {
+            const faq = allFAQs.find(f => f.id === id);
+            if (!faq) return;
+
+            document.getElementById('modalTitle').textContent = 'Q&A 수정';
+            document.getElementById('editId').value = faq.id;
+            document.getElementById('editCategory').value = faq.category;
+            document.getElementById('editEnabled').value = String(faq.enabled !== false);
+            document.getElementById('editQuestion').value = faq.question;
+            document.getElementById('editKeywords').value = (faq.keywords || []).join(', ');
+            document.getElementById('editAnswer').value = faq.answer;
+            openModal('editModal');
+        }
+
+        // ===== FAQ 저장 =====
+        async function saveFAQ() {
+            const id = document.getElementById('editId').value;
+            const body = {
+                category: document.getElementById('editCategory').value,
+                question: document.getElementById('editQuestion').value.trim(),
+                keywords: document.getElementById('editKeywords').value,
+                answer: document.getElementById('editAnswer').value.trim(),
+                enabled: document.getElementById('editEnabled').value === 'true'
+            };
+
+            if (!body.question || !body.answer) {
+                showToast('질문과 답변은 필수입니다', 'error');
+                return;
+            }
+
+            try {
+                const url = id ? `/api/admin/faq/${id}` : '/api/admin/faq';
+                const method = id ? 'PUT' : 'POST';
+
+                const res = await fetch(url, {
+                    method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    closeModal('editModal');
+                    showToast(id ? 'Q&A가 수정되었습니다 ✅' : '새 Q&A가 추가되었습니다 ✅', 'success');
+                    loadFAQs();
+                    loadStats();
+                }
+            } catch (e) {
+                showToast('저장 실패: ' + e.message, 'error');
+            }
+        }
+
+        // ===== 활성화 토글 =====
+        async function toggleFAQ(id, checkbox) {
+            try {
+                const res = await fetch(`/api/admin/faq/${id}/toggle`, {
+                    method: 'PATCH',
+                    headers: { Authorization: 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.enabled ? '활성화되었습니다' : '비활성화되었습니다', 'info');
+                    loadStats();
+                }
+            } catch (e) {
+                checkbox.checked = !checkbox.checked; // 롤백
+                showToast('상태 변경 실패', 'error');
+            }
+        }
+
+        // ===== 삭제 =====
+        function openDeleteModal(id, question) {
+            deleteTargetId = id;
+            document.getElementById('deleteDesc').textContent = `"${question.substring(0, 40)}${question.length > 40 ? '...' : ''}"`;
+            openModal('deleteModal');
+        }
+
+        async function confirmDelete() {
+            if (!deleteTargetId) return;
+            try {
+                const res = await fetch(`/api/admin/faq/${deleteTargetId}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeModal('deleteModal');
+                    showToast('삭제되었습니다', 'success');
+                    loadFAQs();
+                    loadStats();
+                }
+            } catch (e) {
+                showToast('삭제 실패', 'error');
+            }
+            deleteTargetId = '';
+        }
+
+        // ===== 유틸리티 =====
+        function openModal(id) { document.getElementById(id).classList.add('open'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `<span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span> ${msg}`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // 모달 외부 클릭 닫기
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', e => {
+                if (e.target === overlay) overlay.classList.remove('open');
+            });
+        });
+
+        // 엔터키 로그인
+        document.getElementById('loginPassword').addEventListener('keydown', e => {
+            if (e.key === 'Enter') login();
+        });
+    </script>
+</body>
+
+</html>

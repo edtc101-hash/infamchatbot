@@ -1,0 +1,49 @@
+{
+    "name": "인팸 AI 챗봇",
+    "short_name": "인팸 챗봇",
+    "description": "인팸(InteriorFamily) AI 고객 서비스 챗봇 - 제품, 배송, 시공 등 모든 질문에 즉시 답변",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#f5f0e8",
+    "theme_color": "#3a7d44",
+    "orientation": "portrait",
+    "scope": "/",
+    "lang": "ko",
+    "categories": [
+        "business",
+        "utilities"
+    ],
+    "icons": [
+        {
+            "src": "/infam-logo.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ],
+    "screenshots": [],
+    "shortcuts": [
+        {
+            "name": "새 대화 시작",
+            "short_name": "새 대화",
+            "url": "/",
+            "icons": [
+                {
+                    "src": "/icons/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "FAQ 관리",
+            "short_name": "관리",
+            "url": "/admin.html",
+            "icons": [
+                {
+                    "src": "/icons/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ]
+}

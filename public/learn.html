@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인팸 AI 학습 모드 | 관리자</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1e293b;
+            --gold: #b08d57;
+            --gold-light: #c9a96e;
+            --green: #22c55e;
+            --green-light: #dcfce7;
+            --red: #ef4444;
+            --bg: #f8fafc;
+            --white: #ffffff;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-400: #94a3b8;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --radius: 12px;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: var(--bg);
+            color: var(--primary);
+        }
+
+        /* 헤더 */
+        .header {
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--gold);
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .header-badge {
+            padding: 4px 10px;
+            background: var(--green-light);
+            color: #16a34a;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            background: var(--white);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            color: var(--gray-600);
+            text-decoration: none;
+            transition: all .2s;
+        }
+
+        .header-btn:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        /* 레이아웃 */
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: calc(100vh - 60px);
+        }
+
+        /* 왼쪽: 학습 채팅 */
+        .learn-chat {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--gray-200);
+        }
+
+        .chat-header-bar {
+            padding: 16px 20px;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .chat-header-bar h2 {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-header-bar p {
+            font-size: 13px;
+            color: var(--gray-400);
+            margin-top: 4px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: var(--bg);
+        }
+
+        .msg {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            line-height: 1.7;
+            word-break: break-word;
+        }
+
+        .msg.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #c9a96e, #e8c47a);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg.bot {
+            align-self: flex-start;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            color: var(--primary);
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg .learn-badge {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 3px 8px;
+            background: var(--green-light);
+            color: #16a34a;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .chat-input-area {
+            padding: 16px 20px;
+            background: var(--white);
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .chat-input-wrap {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input-wrap textarea {
+            flex: 1;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            max-height: 100px;
+            transition: border-color .2s;
+        }
+
+        .chat-input-wrap textarea:focus {
+            border-color: var(--gold);
+        }
+
+        .chat-input-wrap textarea::placeholder {
+            color: var(--gray-400);
+        }
+
+        .send-btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+            transition: opacity .2s;
+        }
+
+        .send-btn:hover {
+            opacity: .9;
+        }
+
+        .send-btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        /* 탭 UI */
+        .tab-bar {
+            display: flex;
+            border-bottom: 1px solid var(--gray-200);
+            background: var(--white);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-400);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all .2s;
+        }
+
+        .tab-btn.active {
+            color: var(--gold);
+            border-bottom-color: var(--gold);
+            font-weight: 600;
+        }
+
+        .tab-btn:hover {
+            color: var(--gold);
+        }
+
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* 대화 업로드 영역 */
+        .upload-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .upload-desc {
+            font-size: 14px;
+            color: var(--gray-600);
+            line-height: 1.6;
+            background: rgba(176, 141, 87, .04);
+            border: 1px solid rgba(176, 141, 87, .12);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+        }
+
+        .upload-textarea {
+            flex: 1;
+            min-height: 200px;
+            padding: 16px;
+            border: 2px dashed var(--gray-200);
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1.7;
+            resize: none;
+            outline: none;
+            background: var(--white);
+            transition: border-color .2s;
+        }
+
+        .upload-textarea:focus {
+            border-color: var(--gold);
+            border-style: solid;
+        }
+
+        .upload-textarea::placeholder {
+            color: var(--gray-300);
+        }
+
+        .upload-btn-wrap {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .upload-result {
+            padding: 14px 16px;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--primary);
+            display: none;
+        }
+
+        .upload-result.show {
+            display: block;
+        }
+
+        .upload-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: var(--green-light);
+            color: #16a34a;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        /* 오른쪽: 학습 데이터 관리 */
+        .learn-data {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .data-header {
+            padding: 16px 20px;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .data-header h2 {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .data-stats {
+            font-size: 13px;
+            color: var(--gray-400);
+        }
+
+        .data-search {
+            padding: 12px 20px;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .data-search input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .data-search input:focus {
+            border-color: var(--gold);
+        }
+
+        .data-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .learn-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            transition: all .2s;
+        }
+
+        .learn-card:hover {
+            border-color: var(--gold);
+            box-shadow: var(--shadow);
+        }
+
+        .learn-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .learn-card-cat {
+            padding: 3px 8px;
+            background: rgba(176, 141, 87, .08);
+            color: var(--gold);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .learn-card-date {
+            font-size: 11px;
+            color: var(--gray-400);
+        }
+
+        .learn-card-q {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .learn-card-a {
+            font-size: 13px;
+            color: var(--gray-600);
+            line-height: 1.5;
+        }
+
+        .learn-card-keywords {
+            margin-top: 6px;
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .learn-card-kw {
+            padding: 2px 6px;
+            background: var(--gray-100);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--gray-600);
+        }
+
+        .learn-card-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+        }
+
+        .learn-card-actions button {
+            padding: 4px 10px;
+            border: 1px solid var(--gray-200);
+            border-radius: 6px;
+            background: var(--white);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            color: var(--gray-600);
+            transition: all .2s;
+        }
+
+        .learn-card-actions .del-btn:hover {
+            background: rgba(239, 68, 68, .06);
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--gray-400);
+        }
+
+        .empty-state .emoji {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        /* 로그인 */
+        .login-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .login-box {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 32px;
+            width: 360px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .12);
+        }
+
+        .login-box h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .login-box p {
+            font-size: 13px;
+            color: var(--gray-400);
+            margin-bottom: 20px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            margin-bottom: 12px;
+        }
+
+        .login-box input:focus {
+            border-color: var(--gold);
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .login-error {
+            color: var(--red);
+            font-size: 12px;
+            margin-bottom: 8px;
+            display: none;
+        }
+
+        @media(max-width:768px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .learn-chat {
+                height: 50vh;
+                border-right: none;
+                border-bottom: 1px solid var(--gray-200);
+            }
+
+            .learn-data {
+                height: 50vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 로그인 -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <h2>🧠 학습 모드 로그인</h2>
+            <p>관리자 비밀번호를 입력하세요</p>
+            <div class="login-error" id="loginError">비밀번호가 올바르지 않습니다.</div>
+            <input type="password" id="loginPw" placeholder="비밀번호" onkeypress="if(event.key==='Enter')doLogin()">
+            <button onclick="doLogin()">로그인</button>
+        </div>
+    </div>
+
+    <!-- 헤더 -->
+    <div class="header">
+        <div class="header-left">
+            <span class="header-logo">🧠 InFam</span>
+            <span class="header-title">AI 학습 모드</span>
+            <span class="header-badge" id="totalBadge">0건 학습됨</span>
+        </div>
+        <div class="header-right">
+            <a href="/" class="header-btn">💬 챗봇으로</a>
+            <a href="/admin.html" class="header-btn">⚙️ FAQ 관리</a>
+        </div>
+    </div>
+
+    <!-- 메인 레이아웃 -->
+    <div class="layout">
+        <!-- 왼쪽: 학습 영역 (탭) -->
+        <div class="learn-chat">
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('chat')">채팅 학습</button>
+                <button class="tab-btn" onclick="switchTab('upload')">대화 업로드</button>
+            </div>
+
+            <!-- 탭1: 채팅 학습 -->
+            <div class="tab-content active" id="tabChat">
+                <div class="chat-header-bar">
+                    <h2>AI에게 가르치기</h2>
+                    <p>시공 문제, 제품 특성, 주의사항 등을 자연스럽게 대화하며 가르쳐주세요</p>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="msg bot">
+                        안녕하세요! 관리자님<br><br>
+                        저에게 인팸 제품에 대한 <strong>시공 노하우, 문제 해결법, 제품 특성</strong> 등을 가르쳐주세요.<br><br>
+                        예시:<br>
+                        • "소프트 스톤 시공할 때 기포가 생기면 스크래퍼로 밀어내야 해"<br>
+                        • "WPC 월패널은 습기가 많은 곳에서는 방습 처리를 먼저 해야 해"<br>
+                        • "카빙 스톤 뒷면에 본드를 바를 때 지그재그로 발라야 접착력이 좋아"<br><br>
+                        가르쳐주신 내용은 자동으로 학습되어 고객 응대에 활용됩니다!
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <div class="chat-input-wrap">
+                        <textarea id="learnInput" rows="2" placeholder="AI에게 가르칠 내용을 입력하세요..."
+                            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendLearn();}"></textarea>
+                        <button class="send-btn" id="sendBtn" onclick="sendLearn()">학습 전송</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 탭2: 대화 업로드 -->
+            <div class="tab-content" id="tabUpload">
+                <div class="upload-area">
+                    <div class="upload-desc">
+                        고객과 나눈 대화를 그대로 붙여넣기 하세요.<br>
+                        AI가 대화 속에서 <strong>유용한 Q&A를 자동으로 추출</strong>하여 학습합니다.
+                    </div>
+                    <textarea class="upload-textarea" id="convTextarea" placeholder="예시:
+고객: 소프트 스톤 시공 후 모서리 부분이 들뜨는데 어떻게 해야 하나요?
+나: 모서리 부분은 본드를 추가로 도포하고 마스킹 테이프로 12시간 고정하면 됩니다.
+고객: 감사합니다. 그리고 커터기로 잘라도 되나요?
+나: 네, 아트나이프로 가볍게 자르면 깔끔하게 커팅됩니다.
+
+이런 식으로 대화를 붙여넣기 해주세요."></textarea>
+                    <div class="upload-result" id="uploadResult"></div>
+                    <div class="upload-btn-wrap">
+                        <button class="send-btn" id="uploadBtn" onclick="analyzeConversation()">대화 분석 & 학습</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 학습 데이터 관리 -->
+        <div class="learn-data">
+            <div class="data-header">
+                <h2>📚 학습된 지식</h2>
+                <span class="data-stats" id="dataStats">총 0건</span>
+            </div>
+            <div class="data-search">
+                <input type="text" id="searchInput" placeholder="🔍 학습 데이터 검색..." oninput="loadLearnedData()">
+            </div>
+            <div class="data-list" id="dataList">
+                <div class="empty-state">
+                    <div class="emoji">🧠</div>
+                    <p>아직 학습된 지식이 없습니다<br>왼쪽에서 AI에게 가르쳐주세요!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = '';
+        const learnSessionId = 'learn_' + Math.random().toString(36).substring(2);
+
+        // === 로그인 ===
+        async function doLogin() {
+            const pw = document.getElementById('loginPw').value;
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pw })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    authToken = data.token;
+                    document.getElementById('loginOverlay').style.display = 'none';
+                    loadLearnedData();
+                } else {
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch (e) {
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+
+        // === 채팅 학습 ===
+        async function sendLearn() {
+            const input = document.getElementById('learnInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            addChatMsg(msg, 'user');
+            input.value = '';
+            document.getElementById('sendBtn').disabled = true;
+
+            // 로딩 표시
+            const loadingEl = document.createElement('div');
+            loadingEl.className = 'msg bot';
+            loadingEl.innerHTML = '🤔 학습 중...';
+            document.getElementById('chatMessages').appendChild(loadingEl);
+            scrollChat();
+
+            try {
+                const res = await fetch('/api/admin/learn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ message: msg, sessionId: learnSessionId })
+                });
+                const data = await res.json();
+                loadingEl.remove();
+
+                let responseHtml = data.response
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+
+                if (data.learnedCount > 0) {
+                    responseHtml += `<div class="learn-badge">🧠 ${data.learnedCount}건 새로 학습됨!</div>`;
+                }
+                addChatMsg(responseHtml, 'bot', true);
+                loadLearnedData();
+            } catch (e) {
+                loadingEl.remove();
+                addChatMsg('⚠️ 오류가 발생했습니다. 다시 시도해주세요.', 'bot');
+            }
+            document.getElementById('sendBtn').disabled = false;
+        }
+
+        function addChatMsg(content, type, isHtml = false) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            if (isHtml) { div.innerHTML = content; } else { div.textContent = content; }
+            document.getElementById('chatMessages').appendChild(div);
+            scrollChat();
+        }
+
+        function scrollChat() {
+            const el = document.getElementById('chatMessages');
+            requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+        }
+
+        // === 학습 데이터 관리 ===
+        async function loadLearnedData() {
+            const search = document.getElementById('searchInput')?.value || '';
+            try {
+                const res = await fetch(`/api/admin/learned?search=${encodeURIComponent(search)}`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const data = await res.json();
+                document.getElementById('totalBadge').textContent = `${data.allTotal}건 학습됨`;
+                document.getElementById('dataStats').textContent = `총 ${data.total}건`;
+                renderCards(data.data);
+            } catch (e) {
+                console.error('데이터 로드 오류:', e);
+            }
+        }
+
+        function renderCards(items) {
+            const list = document.getElementById('dataList');
+            if (items.length === 0) {
+                list.innerHTML = `<div class="empty-state"><div class="emoji">🧠</div><p>아직 학습된 지식이 없습니다<br>왼쪽에서 AI에게 가르쳐주세요!</p></div>`;
+                return;
+            }
+            list.innerHTML = items.map(item => `
+    <div class="learn-card" id="card-${item.id}">
+      <div class="learn-card-top">
+        <span class="learn-card-cat">${item.category}</span>
+        <span class="learn-card-date">${new Date(item.learnedAt).toLocaleDateString('ko-KR')}</span>
+      </div>
+      <div class="learn-card-q">Q. ${escapeHtml(item.question)}</div>
+      <div class="learn-card-a">${escapeHtml(item.answer)}</div>
+      ${item.keywords?.length > 0 ? `<div class="learn-card-keywords">${item.keywords.map(k => `<span class="learn-card-kw">${k}</span>`).join('')}</div>` : ''}
+      <div class="learn-card-actions">
+        <button class="del-btn" onclick="deleteLearn('${item.id}')">🗑 삭제</button>
+      </div>
+    </div>
+  `).join('');
+        }
+
+        async function deleteLearn(id) {
+            if (!confirm('이 학습 데이터를 삭제하시겠습니까?')) return;
+            try {
+                await fetch(`/api/admin/learned/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                loadLearnedData();
+            } catch (e) {
+                alert('삭제 실패: ' + e.message);
+            }
+        }
+
+        function escapeHtml(text) {
+            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // === 탭 전환 ===
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', (tabId === 'chat' && i === 0) || (tabId === 'upload' && i === 1));
+            });
+            document.getElementById('tabChat').classList.toggle('active', tabId === 'chat');
+            document.getElementById('tabUpload').classList.toggle('active', tabId === 'upload');
+        }
+
+        // === 대화 업로드 분석 ===
+        async function analyzeConversation() {
+            const textarea = document.getElementById('convTextarea');
+            const text = textarea.value.trim();
+            if (!text || text.length < 20) {
+                alert('대화 내용을 최소 20자 이상 입력해주세요.');
+                return;
+            }
+
+            const btn = document.getElementById('uploadBtn');
+            const resultEl = document.getElementById('uploadResult');
+            btn.disabled = true;
+            btn.textContent = '분석 중...';
+            resultEl.className = 'upload-result';
+            resultEl.innerHTML = '';
+
+            try {
+                const res = await fetch('/api/admin/learn-conversation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ conversation: text })
+                });
+                const data = await res.json();
+
+                let html = '';
+                if (data.learnedCount > 0) {
+                    html += `<div class="upload-count">${data.learnedCount}건 학습 완료!</div><br>`;
+                    html += data.learnedItems.map(i => `<strong>[${i.category}]</strong> ${escapeHtml(i.question)}`).join('<br>');
+                    html += '<br><br>';
+                }
+                html += (data.response || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+
+                resultEl.innerHTML = html;
+                resultEl.className = 'upload-result show';
+                loadLearnedData();
+            } catch (e) {
+                resultEl.innerHTML = '오류가 발생했습니다. 다시 시도해주세요.';
+                resultEl.className = 'upload-result show';
+            }
+            btn.disabled = false;
+            btn.textContent = '대화 분석 & 학습';
+        }
+    </script>
+</body>
+
+</html>
