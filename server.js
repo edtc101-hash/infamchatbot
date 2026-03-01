@@ -1801,99 +1801,11 @@ function cleanupContentDashboard() {
     }
 }
 
-process.on('exit', () => { cleanupContentDashboard(); cleanupLayeredService(); });
-process.on('SIGINT', () => { cleanupContentDashboard(); cleanupLayeredService(); process.exit(); });
-process.on('SIGTERM', () => { cleanupContentDashboard(); cleanupLayeredService(); process.exit(); });
+process.on('exit', () => { cleanupContentDashboard(); });
+process.on('SIGINT', () => { cleanupContentDashboard(); process.exit(); });
+process.on('SIGTERM', () => { cleanupContentDashboard(); process.exit(); });
 
-// ========================
-// Qwen-Image-Layered 서비스 자동 실행
-// ========================
-let layeredServiceProcess = null;
-
-function startLayeredService() {
-    const scriptPath = path.resolve(__dirname, '.agent', '인팸이미지', 'scripts', 'layered_service.py');
-
-    if (!fs.existsSync(scriptPath)) {
-        console.log('⚠️ Qwen-Image-Layered 스크립트를 찾을 수 없습니다:', scriptPath);
-        return;
-    }
-
-    console.log('🧠 Qwen-Image-Layered 서비스 시작 중...');
-
-    layeredServiceProcess = spawn('python', [scriptPath], {
-        cwd: path.dirname(scriptPath),
-        shell: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }
-    });
-
-    layeredServiceProcess.stdout.on('data', (data) => {
-        const msg = data.toString().trim();
-        if (msg) console.log(`  [레이어] ${msg}`);
-    });
-
-    layeredServiceProcess.stderr.on('data', (data) => {
-        const msg = data.toString().trim();
-        if (msg && !msg.includes('INFO:')) console.log(`  [레이어 ERR] ${msg}`);
-        if (msg.includes('Uvicorn running') || msg.includes('Started server')) {
-            console.log('✅ Qwen-Image-Layered 서비스: http://localhost:8100');
-        }
-    });
-
-    layeredServiceProcess.on('error', (err) => {
-        console.log('⚠️ Qwen-Image-Layered 실행 실패:', err.message);
-    });
-
-    layeredServiceProcess.on('exit', (code) => {
-        if (code !== null && code !== 0) console.log(`⚠️ Qwen-Image-Layered 종료 (${code})`);
-        layeredServiceProcess = null;
-    });
-}
-
-function cleanupLayeredService() {
-    if (layeredServiceProcess) {
-        console.log('🔒 Qwen-Image-Layered 서비스 종료...');
-        layeredServiceProcess.kill();
-        layeredServiceProcess = null;
-    }
-}
-
-// Qwen-Image-Layered 프록시 엔드포인트
-app.all('/api/layered/*', async (req, res) => {
-    try {
-        const targetPath = req.originalUrl;
-        const targetUrl = `http://localhost:8100${targetPath}`;
-
-        const fetchOpts = { method: req.method, headers: {} };
-
-        if (req.method !== 'GET' && req.method !== 'HEAD') {
-            if (req.is('multipart/form-data')) {
-                // multipart 폼데이터는 multer로 처리된 후이므로, 직접 전달이 필요
-                // 여기서는 JSON body만 프록시
-                fetchOpts.headers['Content-Type'] = 'application/json';
-                fetchOpts.body = JSON.stringify(req.body);
-            } else {
-                fetchOpts.headers['Content-Type'] = req.get('Content-Type') || 'application/json';
-                fetchOpts.body = JSON.stringify(req.body);
-            }
-        }
-
-        const proxyRes = await fetch(targetUrl, fetchOpts);
-        const contentType = proxyRes.headers.get('content-type') || '';
-
-        res.status(proxyRes.status);
-        if (contentType.includes('image')) {
-            res.set('Content-Type', contentType);
-            const buffer = Buffer.from(await proxyRes.arrayBuffer());
-            res.send(buffer);
-        } else {
-            const data = await proxyRes.json();
-            res.json(data);
-        }
-    } catch (err) {
-        res.status(503).json({ error: 'Qwen-Image-Layered 서비스에 연결할 수 없습니다. 모델 로딩 중일 수 있습니다.' });
-    }
-});
+// (Qwen-Image-Layered 서비스 — 비활성화됨)
 
 // ========================
 // AI 이미지 분석/생성 API (Hugging Face Inference)
@@ -2274,7 +2186,6 @@ app.listen(PORT, async () => {
     // 로컬 환경에서만 자식 서비스 실행 (클라우드에는 Python 서비스 없음)
     if (!process.env.RENDER) {
         startContentDashboard();
-        startLayeredService();
     } else {
         console.log('☁️ 클라우드 환경 — 자식 서비스(콘텐츠 대시보드/Qwen) 스킵');
     }
