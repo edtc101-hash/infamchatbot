@@ -741,7 +741,7 @@ ${contextSection}${historyContext}
             });
             const result = await chat.sendMessage(systemPrompt);
             aiResponse = result.response.text();
-            console.log(`✅ AI 응답 성공 (시도 ${attempt}, 모델: gemini-2.5-pro, 의도: ${intent.id})`);
+            console.log(`✅ AI 응답 성공 (시도 ${attempt}, 모델: gemini-3.1-pro-preview, 의도: ${intent.id})`);
             break;
         } catch (err) {
             const isQuota = err.status === 429;
@@ -1101,7 +1101,7 @@ ${conversation}
     }
 });
 
-// 문서 파일 업로드 → 텍스트 추출 → AI 자동 파싱 및 학습
+// 문서 파일 업로드 → 텍스트 추출 → AI 자동 파싱 및 학습 (강화된 파이프라인)
 app.post('/api/admin/upload-knowledge', adminAuth, upload.array('documents'), async (req, res) => {
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({ error: '업로드된 파일이 없습니다.' });
@@ -1109,10 +1109,12 @@ app.post('/api/admin/upload-knowledge', adminAuth, upload.array('documents'), as
 
     try {
         let extractedText = '';
+        const fileNames = [];
 
         for (const file of req.files) {
             const ext = path.extname(file.originalname).toLowerCase();
             const filePath = file.path;
+            fileNames.push(file.originalname);
 
             try {
                 if (ext === '.txt') {
@@ -1145,78 +1147,146 @@ app.post('/api/admin/upload-knowledge', adminAuth, upload.array('documents'), as
             return res.status(400).json({ error: '파일에서 텍스트를 추출하지 못했습니다.' });
         }
 
-        // 텍스트를 일정 크기로 자르기 (10000자 기준)
-        const chunkSize = 10000;
+        console.log(`📄 텍스트 추출 완료: ${extractedText.length}자 (파일: ${fileNames.join(', ')})`);
+
+        // ─── 1단계: 스마트 청킹 (오버랩 포함, 확대) ───
+        const CHUNK_SIZE = 8000;   // 6000→8000 (청크 수 30% 감소)
+        const OVERLAP = 400;
         const chunks = [];
-        for (let i = 0; i < extractedText.length; i += chunkSize) {
-            chunks.push(extractedText.slice(i, i + chunkSize));
+        for (let i = 0; i < extractedText.length; i += CHUNK_SIZE - OVERLAP) {
+            const chunk = extractedText.slice(i, i + CHUNK_SIZE).trim();
+            if (chunk.length > 100) chunks.push(chunk);
         }
+        console.log(`📦 ${chunks.length}개 청크로 분할 (${CHUNK_SIZE}자 기준, ${OVERLAP}자 오버랩)`);
 
         let totalExtractedItems = [];
+        const startTime = Date.now();
 
-        // 각 청크마다 Gemini 호출하여 Q&A 추출
-        for (const [index, chunk] of chunks.entries()) {
-            const analyzePrompt = `너는 인팸(InteriorFamily) 벽장재 전문 회사의 AI 어시스턴트야.
-아래는 직원이 새로 업로드한 실무 문서(또는 문서의 일부분)야. 이 내용을 분석해서 고객 서비스 AI가 바로 써먹을 수 있는 강력한 지식(Q&A)으로 변환해줘.
+        // ─── 2단계: Gemini Flash로 병렬 Q&A 추출 (3개 동시) ───
+        const flashModel = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' }); // Flash = 5~10x 빠름
+        const CONCURRENCY = 3; // 동시 처리 수
+
+        async function processChunk(chunk, index) {
+            const analyzePrompt = `너는 인팸(InteriorFamily) 벽장재 전문 회사의 시니어 지식 관리자야.
+아래는 직원이 업로드한 실무 문서의 일부야. 이 내용을 분석해서 **고객 서비스 AI 챗봇**이 즉시 활용할 수 있는 고품질 Q&A 지식으로 변환해.
 
 === 문서 내용 (파트 ${index + 1}/${chunks.length}) ===
 ${chunk}
 === 끝 ===
 
-지시사항:
-1. 중요한 정보들을 뽑아내서 "질문"과 "답변" 형태의 쌍으로 여러 개 정리해 내.
-2. 답변은 문서의 내용을 완전히 반영하되, 고객에게 설명하듯 친절하고 전문적으로 작성해.
-3. 관련 '키워드' 목록을 풍부하게 뽑아줘.
+📋 **추출 지침 (매우 중요):**
+1. 문서에서 모든 유용한 정보를 빠짐없이 추출해. 최소 3건 ~ 최대 15건까지 추출 가능.
+2. **질문(question)**: 고객이 실제로 물어볼 법한 자연스러운 질문으로 작성. 구체적으로.
+3. **답변(answer)**: 문서 원본 내용을 기반으로 정확하고 상세하게 작성. 숫자, 수치, 규격 등 구체적 데이터를 반드시 포함.
+4. **키워드(keywords)**: 검색에 활용될 핵심 단어 3~8개. 제품명, 기술용어, 동의어 포함.
+5. **카테고리(category)**: 제품, 시공, 배송, 가격, 견적, 유지보수, 시공 팁, 시공 주의사항, 클레임 대응, 기타 중 택 1.
 
-반드시 다음 형식의 JSON 배열로만 정답을 출력해 (다른 말은 절대 쓰지 마):
+⚠️ 절대 하지 말 것:
+- 문서에 없는 내용을 지어내지 마.
+- 너무 일반적이거나 추상적인 QA는 안 돼.
+- 인사말이나 의미없는 정보는 제외.
+
+✅ 출력 형식 — 오직 아래 형태만 출력해. 다른 텍스트 절대 없이 JSON만:
 ---LEARNED---
 [
-  { "category": "제품|시공|배송|견격|기타", "question": "명확한 질문 예시", "answer": "상세한 답변", "keywords": ["키워드1", "키워드2"] }
+  {"category":"카테고리","question":"구체적 질문","answer":"상세하고 정확한 답변","keywords":["키워드1","키워드2","키워드3"]}
 ]
 ---END---`;
 
-            const result = await model.generateContent(analyzePrompt);
-            let aiResponse = result.response.text();
+            try {
+                const result = await flashModel.generateContent(analyzePrompt);
+                let aiResponse = result.response.text();
 
-            const match = aiResponse.match(/---LEARNED---\s*([\s\S]*?)\s*---END---/);
-            if (match && match[1]) {
-                try {
-                    const parsedItems = JSON.parse(match[1]);
-                    if (Array.isArray(parsedItems)) {
-                        totalExtractedItems.push(...parsedItems);
+                const match = aiResponse.match(/---LEARNED---\s*([\s\S]*?)\s*---END---/);
+                if (match && match[1]) {
+                    let jsonStr = match[1].trim();
+                    if (jsonStr.includes('```json')) {
+                        jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();
+                    } else if (jsonStr.includes('```')) {
+                        jsonStr = jsonStr.split('```')[1].split('```')[0].trim();
                     }
-                } catch (parseErr) {
-                    console.error('문서 청크 파싱 오류:', parseErr);
+                    const parsedItems = JSON.parse(jsonStr);
+                    if (Array.isArray(parsedItems)) {
+                        console.log(`  ✅ 청크 ${index + 1}: ${parsedItems.length}건 추출`);
+                        return parsedItems;
+                    }
                 }
+                console.warn(`  ⚠️ 청크 ${index + 1}: ---LEARNED--- 블록 미발견`);
+                return [];
+            } catch (aiErr) {
+                console.error(`  ❌ 청크 ${index + 1} AI 호출 실패:`, aiErr.message);
+                return [];
             }
         }
+
+        // 병렬 배치 처리 (CONCURRENCY개씩 동시 실행)
+        for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+            const batch = chunks.slice(i, i + CONCURRENCY);
+            const batchPromises = batch.map((chunk, batchIdx) => processChunk(chunk, i + batchIdx));
+            const batchResults = await Promise.all(batchPromises);
+            batchResults.forEach(items => totalExtractedItems.push(...items));
+            console.log(`  📊 배치 ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(chunks.length / CONCURRENCY)} 완료`);
+        }
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`🧠 총 ${totalExtractedItems.length}건 Q&A 추출 완료 (${elapsed}초 소요, Flash 병렬×${CONCURRENCY})`);
 
         if (totalExtractedItems.length === 0) {
             return res.status(400).json({ error: '문서는 인식되었으나 유의미한 Q&A 지식을 추출하지 못했습니다. 형식을 확인해주세요.' });
         }
 
-        // learned-data.json 에 추가
+        // ─── 3단계: learned-data.json에 Q&A 저장 ───
         const existingData = loadLearnedData();
         for (const item of totalExtractedItems) {
             existingData.push({
-                id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
+                id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
                 category: item.category || '기타',
                 question: item.question,
                 answer: item.answer,
                 keywords: item.keywords || [],
                 source: 'document_upload',
+                sourceFile: fileNames.join(', '),
                 learnedAt: new Date().toISOString()
             });
         }
         saveLearnedData(existingData);
 
-        // 비동기로 RAG 벡터 스토어 업데이트
-        buildVectorStore().then(r => console.log('✅ 문서 업로드 후 RAG 재빌드 완료:', r.totalDocuments)).catch(console.error);
+        // ─── 4단계: 원문 텍스트 청크도 RAG에 직접 저장 (Q&A 외에 원본 검색 지원) ───
+        const rawChunkSize = 1500;
+        const rawOverlap = 200;
+        const rawChunks = [];
+        for (let i = 0; i < extractedText.length; i += rawChunkSize - rawOverlap) {
+            const chunk = extractedText.slice(i, i + rawChunkSize).trim();
+            if (chunk.length > 100) rawChunks.push(chunk);
+        }
+        // 원문 청크를 learned-data에 RAG 전용 항목으로 추가
+        for (let i = 0; i < Math.min(rawChunks.length, 30); i++) {
+            existingData.push({
+                id: 'rawdoc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                category: '문서 원문',
+                question: `[${fileNames.join(', ')}] 문서 내용 (${i + 1}/${Math.min(rawChunks.length, 30)})`,
+                answer: rawChunks[i],
+                keywords: fileNames.flatMap(n => n.replace(/\.[^.]+$/, '').split(/[\s_-]+/)),
+                source: 'document_raw_chunk',
+                sourceFile: fileNames.join(', '),
+                learnedAt: new Date().toISOString()
+            });
+        }
+        saveLearnedData(existingData);
+
+        // ─── 5단계: 캐시 무효화 + RAG 벡터 스토어 비동기 리빌드 ───
+        responseCache.clear();
+        buildVectorStore().then(r => {
+            console.log(`✅ 문서 업로드 후 RAG 재빌드 완료: ${r.totalDocuments}개 문서`);
+        }).catch(console.error);
+
+        console.log(`🎉 파일 업로드 학습 완료! Q&A ${totalExtractedItems.length}건 + 원문청크 ${Math.min(rawChunks.length, 30)}건`);
 
         res.json({
             success: true,
             extractedCount: totalExtractedItems.length,
             chunksExtracted: totalExtractedItems.length,
+            rawChunksStored: Math.min(rawChunks.length, 30),
             ragTotal: existingData.length + loadFAQData().length + loadProductData().length,
             items: totalExtractedItems.map(item => ({
                 category: item.category || '기타',
@@ -1472,7 +1542,7 @@ app.post('/api/design/analyze', upload.single('file'), async (req, res) => {
 
         console.log(`🎨 디자인 분석 요청: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)}KB)`);
 
-        const analyzeModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+        const analyzeModel = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
         const prompt = `당신은 전문 디자인 분석가입니다. 업로드된 이미지/문서에서 디자인 톤앤매너를 분석해주세요.
 
@@ -1546,19 +1616,20 @@ app.post('/api/design/modify', async (req, res) => {
 - 레이아웃: ${analysis.layout || '없음'}`;
         }
 
-        const systemPrompt = `당신은 인팸(InteriorFamily)의 전문 디자인 AI 어시스턴트입니다.
-사용자의 디자인 수정/생성 요청에 대해 전문적으로 대응합니다.
+        const systemPrompt = `당신은 이미지 편집 도구입니다. 
+사용자가 업로드한 원본 이미지를 **부분적으로만 수정**하세요.
+
+# 핵심 규칙 (반드시 지킬 것):
+1. **절대 새로운 이미지를 처음부터 생성하지 마세요.** 원본 이미지를 기반으로 요청한 부분만 수정하세요.
+2. 원본 이미지의 전체 구도, 레이아웃, 스타일, 톤앤매너를 그대로 유지하세요.
+3. 사용자가 지시한 영역/요소만 최소한으로 변경하세요.
+4. 변경하지 않은 부분은 원본과 완전히 동일해야 합니다.
+5. 한국어로 짧게 답변하세요. "수정 완료했습니다" 정도면 충분합니다.
+6. 이미지가 첨부된 경우, 반드시 수정된 이미지를 반환하세요.
 
 ${contextInfo}
 
-# 응답 규칙:
-1. 이미지가 첨부된 경우, 이미지를 분석하고 수정된 이미지를 생성해주세요.
-2. 이미지 생성/수정 요청이면 반드시 이미지를 생성하여 함께 반환하세요.
-3. 한국어 합니다체로 답변하세요.
-4. 디자인 변경 시 구체적인 안내와 함께 수정된 이미지를 제공하세요.
-5. 색상은 HEX 코드, 폰트는 구체적 이름으로 제안하세요.
-
-사용자 요청:`;
+사용자 수정 요청:`;
 
         // Nano Banana용 콘텐츠 구성
         const contents = [];
@@ -1619,9 +1690,9 @@ ${contextInfo}
                 }
             }
         } catch (nbErr) {
-            console.warn('⚠️ Nano Banana 실패, gemini-2.5-pro로 펴백:', nbErr.message);
-            // 펴백: gemini-2.5-pro
-            const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+            console.warn('⚠️ Nano Banana 실패, gemini-3.1-pro-preview로 펴백:', nbErr.message);
+            // 펴백: gemini-3.1-pro-preview
+            const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
             const fallbackParts = contentParts;
             const fallbackResult = await fallbackModel.generateContent(fallbackParts);
             responseText = fallbackResult.response.text();
@@ -1709,7 +1780,7 @@ app.post('/api/design/generate', async (req, res) => {
         const { preset, analysis, parameters } = req.body;
         console.log(`🎨 디자인 생성 요청: ${preset}`);
 
-        const designModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+        const designModel = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
         let contextInfo = '';
         if (analysis) {
@@ -2031,7 +2102,7 @@ app.post('/api/design/modify', async (req, res) => {
 
         // === 이미지가 첨부된 경우: Nano Banana 2/Pro로 이미지 편집 ===
         if (imageBase64) {
-            const editPrompt = `${contextText ? '[톤앤매너 유지] ' + contextText : ''}이 이미지를 다음과 같이 수정해주세요: ${message}. 원본 이미지의 스타일과 톤앤매너를 최대한 유지하면서 요청한 부분만 변경하세요. 수정된 이미지를 생성해주세요.`;
+            const editPrompt = `이 이미지에서 요청한 부분만 수정하세요. 절대 새로운 이미지를 처음부터 만들지 마세요.\n원본 이미지의 구도, 레이아웃, 스타일을 그대로 유지하면서 아래 요청 사항만 변경하세요.\n${contextText ? '톤앤매너: ' + contextText : ''}\n수정 요청: ${message}`;
 
             // 1차 시도: Nano Banana 2 (gemini-3.1-flash-image-preview)
             try {
@@ -2162,6 +2233,348 @@ app.post('/api/design/extract-images', async (req, res) => {
         console.error('이미지 추출 오류:', err.message);
         res.status(500).json({ error: err.message });
     }
+});
+
+// ========================
+// Ecount ERP API 프록시
+// ========================
+const ECOUNT_COM_CODE = process.env.ECOUNT_COM_CODE || '';
+const ECOUNT_USER_ID = process.env.ECOUNT_USER_ID || '';
+const ECOUNT_API_CERT_KEY = process.env.ECOUNT_API_CERT_KEY || '';
+
+// Ecount 세션 캐시
+let ecountSession = {
+    zone: null,
+    sessionId: null,
+    lastLogin: null,
+    baseUrl: null,
+};
+
+// Zone 조회
+async function ecountGetZone() {
+    try {
+        const resp = await fetch('https://oapi.ecount.com/OAPI/V2/Zone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                COM_CODE: ECOUNT_COM_CODE,
+                API_CERT_KEY: ECOUNT_API_CERT_KEY,
+            }),
+        });
+        const data = await resp.json();
+        if (data.Status == 200 && data.Data?.ZONE) {
+            ecountSession.zone = data.Data.ZONE;
+            ecountSession.baseUrl = `https://oapi${data.Data.ZONE}.ecount.com`;
+            console.log(`📊 Ecount Zone 획득: ${data.Data.ZONE}, Base: ${ecountSession.baseUrl}`);
+            return data.Data.ZONE;
+        }
+        console.error('❌ Ecount Zone 조회 실패:', JSON.stringify(data));
+        return null;
+    } catch (err) {
+        console.error('❌ Ecount Zone 오류:', err.message);
+        return null;
+    }
+}
+
+// 로그인 → Session ID
+async function ecountLogin() {
+    if (!ecountSession.zone) {
+        const zone = await ecountGetZone();
+        if (!zone) return null;
+    }
+    try {
+        const resp = await fetch(`${ecountSession.baseUrl}/OAPI/V2/OAPILogin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                COM_CODE: ECOUNT_COM_CODE,
+                USER_ID: ECOUNT_USER_ID,
+                API_CERT_KEY: ECOUNT_API_CERT_KEY,
+                LAN_TYPE: 'ko-KR',
+                ZONE: ecountSession.zone,
+            }),
+        });
+        const data = await resp.json();
+        const sessionId = data.Data?.Datas?.SESSION_ID || data.Data?.Sessionid || data.Data?.SESSION_ID;
+        const hostUrl = data.Data?.Datas?.HOST_URL;
+        const code = data.Data?.Code;
+        if (sessionId && code === '00') {
+            ecountSession.sessionId = sessionId;
+            ecountSession.lastLogin = Date.now();
+            if (hostUrl) {
+                ecountSession.baseUrl = `https://${hostUrl}`;
+                console.log(`📊 Ecount HOST_URL: ${hostUrl}`);
+            }
+            console.log('✅ Ecount 로그인 성공 (Session: ' + sessionId.substring(0, 20) + '...)');
+            return sessionId;
+        }
+        const errMsg = data.Data?.Message || `Code: ${code}`;
+        console.error(`❌ Ecount 로그인 실패: ${errMsg}`);
+        console.error('   응답:', JSON.stringify(data));
+        return null;
+    } catch (err) {
+        console.error('❌ Ecount 로그인 오류:', err.message);
+        return null;
+    }
+}
+
+// 세션 확보 (캐시 or 재로그인 — 30분마다 갱신)
+async function ensureEcountSession() {
+    const SESSION_TTL = 30 * 60 * 1000; // 30분
+    if (ecountSession.sessionId && ecountSession.lastLogin && (Date.now() - ecountSession.lastLogin < SESSION_TTL)) {
+        return ecountSession.sessionId;
+    }
+    return await ecountLogin();
+}
+
+// Ecount API 호출 헬퍼 (자동 재로그인)
+async function ecountApiCall(endpoint, body = {}, method = 'POST') {
+    const sessionId = await ensureEcountSession();
+    if (!sessionId) return { error: 'Ecount 세션 확보 실패' };
+
+    // SESSION_ID는 URL 쿼리 파라미터로 전달 (Ecount V2 표준)
+    const url = `${ecountSession.baseUrl}/OAPI/V2/${endpoint}?SESSION_ID=${encodeURIComponent(sessionId)}`;
+    try {
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: method === 'POST' ? JSON.stringify(body) : undefined,
+        });
+        const data = await resp.json();
+
+        // 디버그 로깅
+        const dataKeys = data.Data ? Object.keys(data.Data) : [];
+        console.log(`📡 Ecount API [${endpoint}] Status=${data.Status}, DataKeys=[${dataKeys.join(',')}]`);
+        if (data.Data?.Datas) {
+            const datas = data.Data.Datas;
+            const count = Array.isArray(datas) ? datas.length : typeof datas === 'object' ? Object.keys(datas).length : 0;
+            console.log(`   ↳ Datas: ${count} items`);
+        }
+        if (data.Errors && data.Errors.length) {
+            console.log(`   ↳ Errors: ${JSON.stringify(data.Errors)}`);
+        }
+
+        // 세션 만료 시 재로그인 후 재시도
+        if (data.Status == 401 || data.Status == 403 ||
+            (data.Errors && data.Errors.some(e => e.Message?.includes('login')))) {
+            console.log('🔄 Ecount 세션 만료, 재로그인...');
+            ecountSession.sessionId = null;
+            const newSession = await ecountLogin();
+            if (!newSession) return { error: '재로그인 실패' };
+            const retryUrl = `${ecountSession.baseUrl}/OAPI/V2/${endpoint}?SESSION_ID=${encodeURIComponent(newSession)}`;
+            const retryResp = await fetch(retryUrl, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: method === 'POST' ? JSON.stringify(body) : undefined,
+            });
+            return await retryResp.json();
+        }
+
+        return data;
+    } catch (err) {
+        console.error(`❌ Ecount API [${endpoint}] 오류:`, err.message);
+        return { error: err.message };
+    }
+}
+
+// Ecount 응답에서 실제 데이터 배열 추출 헬퍼
+function extractEcountData(result) {
+    if (!result || result.error) return [];
+    // Ecount V2: Data.Datas (array or object)
+    const datas = result?.Data?.Datas;
+    if (Array.isArray(datas)) return datas;
+    // Datas가 객체인 경우 (일부 API)
+    if (datas && typeof datas === 'object') {
+        // 값들이 배열이면 첫 번째 배열 반환
+        const vals = Object.values(datas);
+        for (const v of vals) {
+            if (Array.isArray(v)) return v;
+        }
+        return [datas];
+    }
+    // Data.Result 폴백
+    if (Array.isArray(result?.Data?.Result)) return result.Data.Result;
+    if (Array.isArray(result?.Data)) return result.Data;
+    return [];
+}
+
+// --- ERP API 엔드포인트 ---
+
+// 재고 현황
+app.get('/api/erp/inventory', async (req, res) => {
+    try {
+        const { page = 1, perPage = 100, searchText = '' } = req.query;
+        const result = await ecountApiCall('InventoryBalance/GetListInventoryBalanceStatus', {
+            PAGE: parseInt(page),
+            PER_PAGE: parseInt(perPage),
+            SEARCH_TEXT: searchText,
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 재고 (위치별)
+app.get('/api/erp/inventory-by-location', async (req, res) => {
+    try {
+        const { page = 1, perPage = 100 } = req.query;
+        const result = await ecountApiCall('InventoryBalance/GetListInventoryBalanceStatusByLocation', {
+            PAGE: parseInt(page),
+            PER_PAGE: parseInt(perPage),
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 매출 현황
+app.get('/api/erp/sales', async (req, res) => {
+    try {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const { fromDate, toDate, page = 1, perPage = 100 } = req.query;
+        const result = await ecountApiCall('Sale/GetListSaleSlip', {
+            SL_FROM: fromDate || firstDay.toISOString().split('T')[0].replace(/-/g, ''),
+            SL_TO: toDate || today.toISOString().split('T')[0].replace(/-/g, ''),
+            PAGE: parseInt(page),
+            PER_PAGE: parseInt(perPage),
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 매입 현황
+app.get('/api/erp/purchases', async (req, res) => {
+    try {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const { fromDate, toDate, page = 1, perPage = 100 } = req.query;
+        const result = await ecountApiCall('Purchase/GetListPurchaseSlip', {
+            SL_FROM: fromDate || firstDay.toISOString().split('T')[0].replace(/-/g, ''),
+            SL_TO: toDate || today.toISOString().split('T')[0].replace(/-/g, ''),
+            PAGE: parseInt(page),
+            PER_PAGE: parseInt(perPage),
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 품목 목록
+app.get('/api/erp/items', async (req, res) => {
+    try {
+        const { page = 1, perPage = 200, searchText = '' } = req.query;
+        const result = await ecountApiCall('Item/GetListItem', {
+            PAGE: parseInt(page),
+            PER_PAGE: parseInt(perPage),
+            SEARCH_TEXT: searchText,
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 종합 요약 (여러 API를 합산)
+app.get('/api/erp/summary', async (req, res) => {
+    try {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const fromDate = firstDay.toISOString().split('T')[0].replace(/-/g, '');
+        const toDate = today.toISOString().split('T')[0].replace(/-/g, '');
+
+        // 병렬 API 호출 (각각 에러 핸들링)
+        const safeCall = async (ep, body) => {
+            try { return await ecountApiCall(ep, body); }
+            catch (e) { console.log(`⚠️ ERP API [${ep}] 실패: ${e.message}`); return { Status: 500, Data: {} }; }
+        };
+        const [inventoryResult, salesResult, purchasesResult] = await Promise.all([
+            safeCall('InventoryBalance/GetListInventoryBalanceStatusByLocation', { BASE_DATE: toDate, PAGE: 1, PER_PAGE: 500 }),
+            safeCall('Sale/SaveSale', { SL_FROM: fromDate, SL_TO: toDate, PAGE: 1, PER_PAGE: 500, SEARCH_TYPE: 'LIST' }),
+            safeCall('Purchase/SavePurchase', { SL_FROM: fromDate, SL_TO: toDate, PAGE: 1, PER_PAGE: 500, SEARCH_TYPE: 'LIST' }),
+        ]);
+
+        // 재고 요약
+        let totalInventoryQty = 0;
+        let totalInventoryAmt = 0;
+        let lowStockItems = [];
+        const inventoryItems = extractEcountData(inventoryResult);
+        console.log(`📊 재고 데이터: ${inventoryItems.length}건`);
+        inventoryItems.forEach(item => {
+            const qty = parseFloat(item.BAL_QTY || item.QUANTITY || item.QTY || 0);
+            const amt = parseFloat(item.BAL_AMT || item.AMOUNT || item.AMT || 0);
+            totalInventoryQty += qty;
+            totalInventoryAmt += amt;
+            if (qty > 0 && qty <= 10) {
+                lowStockItems.push({
+                    name: item.PROD_DES || item.ITEM_NAME || item.PROD_NM || '품목',
+                    code: item.PROD_CD || item.ITEM_CODE || '',
+                    qty,
+                });
+            }
+        });
+
+        // 매출 요약
+        let totalSalesAmt = 0;
+        let salesCount = 0;
+        const salesItems = extractEcountData(salesResult);
+        console.log(`📊 매출 데이터: ${salesItems.length}건`);
+        salesCount = salesItems.length;
+        salesItems.forEach(item => {
+            totalSalesAmt += parseFloat(item.SUPPLY_AMT || item.AMOUNT || item.TOT_AMT || 0);
+        });
+
+        // 매입 요약
+        let totalPurchasesAmt = 0;
+        let purchasesCount = 0;
+        const purchaseItems = extractEcountData(purchasesResult);
+        console.log(`📊 매입 데이터: ${purchaseItems.length}건`);
+        purchasesCount = purchaseItems.length;
+        purchaseItems.forEach(item => {
+            totalPurchasesAmt += parseFloat(item.SUPPLY_AMT || item.AMOUNT || item.TOT_AMT || 0);
+        });
+
+        res.json({
+            success: true,
+            period: { from: fromDate, to: toDate },
+            inventory: {
+                totalQty: totalInventoryQty,
+                totalAmt: totalInventoryAmt,
+                itemCount: Array.isArray(inventoryItems) ? inventoryItems.length : 0,
+                lowStockItems: lowStockItems.slice(0, 10),
+                raw: inventoryItems,
+            },
+            sales: {
+                totalAmt: totalSalesAmt,
+                count: salesCount,
+                raw: salesItems,
+            },
+            purchases: {
+                totalAmt: totalPurchasesAmt,
+                count: purchasesCount,
+                raw: purchaseItems,
+            },
+            updatedAt: new Date().toISOString(),
+        });
+    } catch (err) {
+        console.error('❌ ERP 종합 요약 오류:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Ecount 세션 상태 확인
+app.get('/api/erp/status', (req, res) => {
+    res.json({
+        connected: !!ecountSession.sessionId,
+        zone: ecountSession.zone,
+        lastLogin: ecountSession.lastLogin ? new Date(ecountSession.lastLogin).toISOString() : null,
+        configured: !!(ECOUNT_COM_CODE && ECOUNT_USER_ID && ECOUNT_API_CERT_KEY),
+    });
 });
 
 app.listen(PORT, async () => {

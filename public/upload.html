@@ -246,6 +246,69 @@
             cursor: not-allowed;
         }
 
+        /* 상단 고정 액션 바 */
+        .sticky-action-bar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: linear-gradient(135deg, var(--primary), var(--gray-700));
+            color: #fff;
+            padding: 12px 24px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            margin: 0 -20px;
+            width: calc(100% + 40px);
+        }
+
+        .sticky-action-bar.show {
+            display: flex;
+        }
+
+        .sticky-action-bar .sab-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .sticky-action-bar .sab-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .sticky-action-bar .sab-btn {
+            padding: 10px 24px;
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: 0 4px 12px rgba(176, 141, 87, 0.3);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .sticky-action-bar .sab-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(176, 141, 87, 0.4);
+        }
+
+        .sticky-action-bar .sab-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .status-box {
             margin-top: 24px;
             padding: 16px;
@@ -295,66 +358,6 @@
             }
         }
 
-        /* 로그인 오버레이 */
-        .login-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, .3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
-
-        .login-box {
-            background: var(--white);
-            border-radius: 16px;
-            padding: 32px;
-            width: 360px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, .12);
-        }
-
-        .login-box h2 {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-
-        .login-box p {
-            font-size: 13px;
-            color: var(--gray-400);
-            margin-bottom: 20px;
-        }
-
-        .login-box input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid var(--gray-200);
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 14px;
-            outline: none;
-            margin-bottom: 12px;
-        }
-
-        .login-box button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, var(--gold), var(--gold-light));
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .login-error {
-            color: var(--red);
-            font-size: 12px;
-            margin-bottom: 8px;
-            display: none;
-        }
 
         /* ======================== */
         /* 추출된 지식 시각화 영역 */
@@ -696,16 +699,6 @@
 
 <body>
 
-    <!-- 로그인 -->
-    <div class="login-overlay" id="loginOverlay">
-        <div class="login-box">
-            <h2>🧠 관리자 로그인</h2>
-            <p>파일 업로드를 위해 비밀번호를 입력하세요</p>
-            <div class="login-error" id="loginError">비밀번호가 올바르지 않습니다.</div>
-            <input type="password" id="loginPw" placeholder="비밀번호" onkeypress="if(event.key==='Enter')doLogin()">
-            <button onclick="doLogin()">로그인</button>
-        </div>
-    </div>
 
     <!-- 헤더 -->
     <div class="header">
@@ -722,6 +715,14 @@
 
     <!-- 메인 -->
     <div class="container">
+        <!-- 상단 고정 액션 바 -->
+        <div class="sticky-action-bar" id="stickyBar">
+            <div class="sab-info">
+                📄 <span id="stickyFileCount">0</span>개 파일 선택됨
+            </div>
+            <button class="sab-btn" id="stickyUploadBtn" onclick="uploadFiles()">🧠 선택한 파일 저장 및 학습하기</button>
+        </div>
+
         <div class="page-header">
             <h1>텍스트 문서 업로드</h1>
             <p>PDF, 메모장(TXT), 엑셀(XLSX) 파일을 업로드하여 챗봇의 지식 베이스를 확장하세요.<br>업로드된 문서는 RAG 벡터 데이터베이스에 즉시 동기화됩니다.</p>
@@ -739,7 +740,7 @@
 
             <div class="file-list" id="fileList"></div>
 
-            <button class="btn-upload" id="uploadBtn" onclick="uploadFiles()" style="display: none;">선택한 파일 서버에 저장 및
+            <button class="btn-upload" id="uploadBtn" onclick="uploadFiles()" style="display: none;">🧠 선택한 파일 저장 및
                 학습하기</button>
 
             <div class="status-box" id="statusBox"></div>

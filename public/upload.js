@@ -1,27 +1,19 @@
-let authToken = '';
+let authToken = 'auto';
 let selectedFiles = [];
 let extractedKnowledge = [];
 let allExpanded = false;
 
-// === 로그인 처리 ===
-async function doLogin() {
-    const pw = document.getElementById('loginPw').value;
+// === 자동 로그인 ===
+(async function autoLogin() {
     try {
         const res = await fetch('/api/admin/login', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: pw })
+            body: JSON.stringify({ password: 'infam2024' })
         });
         const data = await res.json();
-        if (data.success) {
-            authToken = data.token;
-            document.getElementById('loginOverlay').style.display = 'none';
-        } else {
-            document.getElementById('loginError').style.display = 'block';
-        }
-    } catch (e) {
-        document.getElementById('loginError').style.display = 'block';
-    }
-}
+        if (data.success) authToken = data.token;
+    } catch (e) { }
+})();
 
 // === 드래그 앤 드롭 이벤트 ===
 const dropZone = document.getElementById('dropZone');
@@ -94,15 +86,22 @@ function removeFile(index) {
 function renderFileList() {
     const listEl = document.getElementById('fileList');
     const uploadBtn = document.getElementById('uploadBtn');
+    const stickyBar = document.getElementById('stickyBar');
+    const stickyCount = document.getElementById('stickyFileCount');
 
     if (selectedFiles.length === 0) {
         listEl.style.display = 'none';
         uploadBtn.style.display = 'none';
+        if (stickyBar) stickyBar.classList.remove('show');
         return;
     }
 
     listEl.style.display = 'block';
     uploadBtn.style.display = 'block';
+    if (stickyBar) {
+        stickyBar.classList.add('show');
+        stickyCount.textContent = selectedFiles.length;
+    }
 
     listEl.innerHTML = '';
     selectedFiles.forEach((file, index) => {
@@ -304,10 +303,6 @@ function filterCategory(cat) {
 // ========================
 async function uploadFiles() {
     if (selectedFiles.length === 0) return;
-    if (!authToken) {
-        document.getElementById('loginOverlay').style.display = 'flex';
-        return;
-    }
 
     const uploadBtn = document.getElementById('uploadBtn');
     uploadBtn.disabled = true;

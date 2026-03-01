@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDTC ERP 대시보드 | Ecount 연동</title>
+    <meta name="description" content="EDTC 코퍼레이션 ERP 대시보드 - 재고, 회계, 매출, 매입 통합 관리">
+    <link href="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" rel="prefetch">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-2: #22252f;
+            --surface-3: #2a2d38;
+            --border: #2e3140;
+            --border-hover: #3d4055;
+            --text: #e8eaed;
+            --text-secondary: #9aa0b0;
+            --text-muted: #6b7085;
+            --primary: #4a8eff;
+            --primary-dim: rgba(74, 142, 255, .12);
+            --gold: #e8b84b;
+            --gold-dim: rgba(232, 184, 75, .12);
+            --green: #34d399;
+            --green-dim: rgba(52, 211, 153, .12);
+            --red: #ef4444;
+            --red-dim: rgba(239, 68, 68, .12);
+            --purple: #a78bfa;
+            --purple-dim: rgba(167, 139, 250, .12);
+            --cyan: #22d3ee;
+            --cyan-dim: rgba(34, 211, 238, .12);
+            --radius: 14px;
+            --radius-sm: 10px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, .3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== HEADER ===== */
+        .erp-header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 18px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--purple));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .logo span {
+            color: var(--gold);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-btn {
+            padding: 7px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .2s;
+        }
+
+        .header-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.connected {
+            background: var(--green-dim);
+            color: var(--green);
+        }
+
+        .status-badge.disconnected {
+            background: var(--red-dim);
+            color: var(--red);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .4;
+            }
+        }
+
+        /* ===== NAV TABS ===== */
+        .nav-tabs {
+            display: flex;
+            gap: 2px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .nav-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-tab {
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            white-space: nowrap;
+            border-bottom: 2px solid transparent;
+            transition: all .2s;
+            user-select: none;
+        }
+
+        .nav-tab:hover {
+            color: var(--text-secondary);
+        }
+
+        .nav-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .nav-tab .tab-icon {
+            margin-right: 6px;
+        }
+
+        /* ===== MAIN ===== */
+        .main-content {
+            padding: 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* ===== LOADING OVERLAY ===== */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 17, 23, .85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            gap: 16px;
+            transition: opacity .3s;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* ===== KPI GRID ===== */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: all .3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .kpi-card.blue::before {
+            background: var(--primary);
+        }
+
+        .kpi-card.gold::before {
+            background: var(--gold);
+        }
+
+        .kpi-card.green::before {
+            background: var(--green);
+        }
+
+        .kpi-card.red::before {
+            background: var(--red);
+        }
+
+        .kpi-card.purple::before {
+            background: var(--purple);
+        }
+
+        .kpi-card.cyan::before {
+            background: var(--cyan);
+        }
+
+        .kpi-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .kpi-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .kpi-card.blue .kpi-icon {
+            background: var(--primary-dim);
+        }
+
+        .kpi-card.gold .kpi-icon {
+            background: var(--gold-dim);
+        }
+
+        .kpi-card.green .kpi-icon {
+            background: var(--green-dim);
+        }
+
+        .kpi-card.red .kpi-icon {
+            background: var(--red-dim);
+        }
+
+        .kpi-card.purple .kpi-icon {
+            background: var(--purple-dim);
+        }
+
+        .kpi-card.cyan .kpi-icon {
+            background: var(--cyan-dim);
+        }
+
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .kpi-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* ===== SECTION ===== */
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ===== CHART GRID ===== */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .chart-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+        }
+
+        .chart-wrap {
+            height: 280px;
+            position: relative;
+        }
+
+        /* ===== DATA TABLE ===== */
+        .table-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .table-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .table-search {
+            display: flex;
+            gap: 8px;
+        }
+
+        .table-search input {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 7px 12px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            width: 200px;
+        }
+
+        .table-search input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .table-search input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            padding: 10px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            background: var(--surface-2);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .data-table th:hover {
+            color: var(--primary);
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .data-table tr:hover td {
+            background: var(--surface-2);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .amount {
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .amount.positive {
+            color: var(--green);
+        }
+
+        .amount.negative {
+            color: var(--red);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-blue {
+            background: var(--primary-dim);
+            color: var(--primary);
+        }
+
+        .badge-green {
+            background: var(--green-dim);
+            color: var(--green);
+        }
+
+        .badge-red {
+            background: var(--red-dim);
+            color: var(--red);
+        }
+
+        .badge-gold {
+            background: var(--gold-dim);
+            color: var(--gold);
+        }
+
+        .badge-purple {
+            background: var(--purple-dim);
+            color: var(--purple);
+        }
+
+        /* ===== EMPTY STATE ===== */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state h3 {
+            font-size: 16px;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state p {
+            font-size: 13px;
+        }
+
+        /* ===== QUICK LINKS ===== */
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .quick-link {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            cursor: pointer;
+            transition: all .2s;
+            text-decoration: none;
+            color: var(--text);
+        }
+
+        .quick-link:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .quick-link .ql-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .quick-link .ql-title {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .quick-link .ql-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ===== SUB NAV ===== */
+        .sub-nav {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .sub-nav-btn {
+            padding: 7px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .15s;
+        }
+
+        .sub-nav-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .sub-nav-btn.active {
+            background: var(--primary-dim);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* ===== DATE RANGE ===== */
+        .date-range {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .date-range input[type=date] {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 7px 12px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .date-range input[type=date]:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .date-range span {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .btn-refresh {
+            padding: 7px 16px;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .2s;
+        }
+
+        .btn-refresh:hover {
+            opacity: .85;
+            transform: translateY(-1px);
+        }
+
+        /* ===== FOOTER ===== */
+        .erp-footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-muted);
+            font-size: 12px;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn .4s ease forwards;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 16px;
+            }
+
+            .kpi-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-tab {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .header-top .logo span {
+                display: none;
+            }
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        .table-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">ERP 데이터 로딩 중...</div>
+    </div>
+
+    <!-- Header -->
+    <header class="erp-header">
+        <div class="header-top">
+            <div class="logo">
+                <div class="logo-icon">📊</div>
+                EDTC <span>ERP</span>
+            </div>
+            <div class="header-actions">
+                <div class="status-badge disconnected" id="statusBadge">
+                    <div class="status-dot"></div>
+                    <span id="statusText">연결 중...</span>
+                </div>
+                <button class="header-btn" onclick="refreshData()">🔄 새로고침</button>
+                <button class="header-btn" onclick="window.location.href='/'">← 챗봇으로</button>
+            </div>
+        </div>
+        <nav class="nav-tabs" id="mainNav">
+            <div class="nav-tab active" data-tab="overview"><span class="tab-icon">📈</span>대시보드</div>
+            <div class="nav-tab" data-tab="inventory1"><span class="tab-icon">📦</span>재고 I</div>
+            <div class="nav-tab" data-tab="inventory2"><span class="tab-icon">🏭</span>재고 II</div>
+            <div class="nav-tab" data-tab="accounting1"><span class="tab-icon">💰</span>회계 I</div>
+            <div class="nav-tab" data-tab="accounting2"><span class="tab-icon">🏦</span>회계 II</div>
+            <div class="nav-tab" data-tab="management"><span class="tab-icon">👤</span>관리</div>
+            <div class="nav-tab" data-tab="tax"><span class="tab-icon">📋</span>세무</div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- ===== 대시보드 (Overview) ===== -->
+        <section class="section active" id="sec-overview">
+            <div class="kpi-grid fade-in" id="kpiGrid">
+                <div class="kpi-card blue">
+                    <div class="kpi-label">
+                        <div class="kpi-icon">💰</div>월 매출
+                    </div>
+                    <div class="kpi-value" id="kpiSalesAmt">₩0</div>
+                    <div class="kpi-sub" id="kpiSalesCount">0건 거래</div>
+                </div>
+                <div class="kpi-card green">
+                    <div class="kpi-label">
+                        <div class="kpi-icon">🛒</div>월 매입
+                    </div>
+                    <div class="kpi-value" id="kpiPurchaseAmt">₩0</div>
+                    <div class="kpi-sub" id="kpiPurchaseCount">0건 거래</div>
+                </div>
+                <div class="kpi-card gold">
+                    <div class="kpi-label">
+                        <div class="kpi-icon">📦</div>재고 품목수
+                    </div>
+                    <div class="kpi-value" id="kpiItemCount">0</div>
+                    <div class="kpi-sub" id="kpiInventoryAmt">총 재고액: ₩0</div>
+                </div>
+                <div class="kpi-card red">
+                    <div class="kpi-label">
+                        <div class="kpi-icon">⚠️</div>부족재고
+                    </div>
+                    <div class="kpi-value" id="kpiLowStock">0</div>
+                    <div class="kpi-sub">10개 이하 품목</div>
+                </div>
+                <div class="kpi-card purple">
+                    <div class="kpi-label">
+                        <div class="kpi-icon">📊</div>순이익
+                    </div>
+                    <div class="kpi-value" id="kpiProfit">₩0</div>
+                    <div class="kpi-sub" id="kpiProfitRate">이익률: -</div>
+                </div>
+                <div class="kpi-card cyan">
+                    <div class="kpi-label">
+                        <div class="kpi-icon">🕐</div>마지막 갱신
+                    </div>
+                    <div class="kpi-value" id="kpiLastUpdate" style="font-size:18px;">-</div>
+                    <div class="kpi-sub" id="kpiPeriod">기간: -</div>
+                </div>
+            </div>
+
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h3>📊 매출 vs 매입 추이</h3>
+                    <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3>🍩 자산 구성</h3>
+                    <div class="chart-wrap"><canvas id="doughnutChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- 최근 거래 테이블 -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>📋 최근 판매 데이터<span class="table-count" id="salesTableCount"></span></h3>
+                    <div class="table-search">
+                        <input type="text" placeholder="거래처/품명 검색..." id="salesSearch" oninput="filterSalesTable()">
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table" id="salesTable">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>일자</th>
+                                <th>거래처명</th>
+                                <th>품목</th>
+                                <th>수량</th>
+                                <th>금액</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Low Stock Alert -->
+            <div class="table-card" id="lowStockCard" style="display:none;">
+                <div class="table-header">
+                    <h3>⚠️ 부족 재고 알림</h3>
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>품목코드</th>
+                                <th>품명</th>
+                                <th>현재수량</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lowStockBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 재고 I ===== -->
+        <section class="section" id="sec-inventory1">
+            <div class="section-title">📦 재고 I — 영업관리</div>
+            <div class="sub-nav">
+                <button class="sub-nav-btn active" onclick="loadSubView('inv1','sales')">판매조회</button>
+                <button class="sub-nav-btn" onclick="loadSubView('inv1','purchase')">구매조회</button>
+                <button class="sub-nav-btn" onclick="loadSubView('inv1','items')">품목관리</button>
+                <button class="sub-nav-btn" onclick="loadSubView('inv1','stock')">재고현황</button>
+                <button class="sub-nav-btn" onclick="loadSubView('inv1','shipping')">출하관리</button>
+            </div>
+            <div class="date-range">
+                <input type="date" id="inv1From"> <span>~</span> <input type="date" id="inv1To">
+                <button class="btn-refresh" onclick="loadInventory1Data()">조회</button>
+            </div>
+            <div id="inv1Content">
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3>판매 전표<span class="table-count" id="inv1TableCount"></span></h3>
+                        <div class="table-search">
+                            <input type="text" placeholder="검색..." id="inv1Search">
+                        </div>
+                    </div>
+                    <div class="table-scroll">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>일자</th>
+                                    <th>거래처</th>
+                                    <th>품목</th>
+                                    <th>수량</th>
+                                    <th>공급가</th>
+                                    <th>세액</th>
+                                    <th>합계</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inv1Body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 재고 II ===== -->
+        <section class="section" id="sec-inventory2">
+            <div class="section-title">🏭 재고 II — 고급 관리</div>
+            <div class="quick-links">
+                <div class="quick-link">
+                    <div class="ql-icon">🔧</div>
+                    <div class="ql-title">A/S 관리</div>
+                    <div class="ql-desc">고객 A/S 접수 및 처리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">🏷️</div>
+                    <div class="ql-title">시리얼/로트 No.</div>
+                    <div class="ql-desc">시리얼번호 추적 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">✅</div>
+                    <div class="ql-title">품질관리</div>
+                    <div class="ql-desc">품질검사 및 불량 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📅</div>
+                    <div class="ql-title">계획관리</div>
+                    <div class="ql-desc">생산/구매 계획 수립</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">💹</div>
+                    <div class="ql-title">이익관리</div>
+                    <div class="ql-desc">월별/일별 이익 분석</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📝</div>
+                    <div class="ql-title">오더관리</div>
+                    <div class="ql-desc">수주/발주 오더 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">🌍</div>
+                    <div class="ql-title">수출관리</div>
+                    <div class="ql-desc">수출 인보이스/선적</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">🏪</div>
+                    <div class="ql-title">WMS</div>
+                    <div class="ql-desc">창고관리 시스템</div>
+                </div>
+            </div>
+            <div class="empty-state">
+                <div class="icon">🔜</div>
+                <h3>고급 재고 관리 기능</h3>
+                <p>Ecount ERP에서 직접 이용 가능합니다</p>
+            </div>
+        </section>
+
+        <!-- ===== 회계 I ===== -->
+        <section class="section" id="sec-accounting1">
+            <div class="section-title">💰 회계 I — 매출매입 / 전표</div>
+            <div class="quick-links">
+                <div class="quick-link">
+                    <div class="ql-icon">📑</div>
+                    <div class="ql-title">FastEntry</div>
+                    <div class="ql-desc">빠른 전표 입력</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">🧾</div>
+                    <div class="ql-title">전자세금계산서</div>
+                    <div class="ql-desc">세금계산서 발행/수집</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">🏧</div>
+                    <div class="ql-title">계좌/카드</div>
+                    <div class="ql-desc">은행계좌 및 카드 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">💵</div>
+                    <div class="ql-title">현금거래</div>
+                    <div class="ql-desc">현금영수증 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">🏢</div>
+                    <div class="ql-title">고정자산</div>
+                    <div class="ql-desc">고정자산 등록/감가상각</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📊</div>
+                    <div class="ql-title">재무제표</div>
+                    <div class="ql-desc">경영자료 / 장부 출력</div>
+                </div>
+            </div>
+            <div class="empty-state">
+                <div class="icon">📑</div>
+                <h3>회계 전표 관리</h3>
+                <p>Ecount ERP에서 직접 이용 가능합니다</p>
+            </div>
+        </section>
+
+        <!-- ===== 회계 II ===== -->
+        <section class="section" id="sec-accounting2">
+            <div class="section-title">🏦 회계 II — 채권/채무 / 예산</div>
+            <div class="quick-links">
+                <div class="quick-link">
+                    <div class="ql-icon">📈</div>
+                    <div class="ql-title">채권관리</div>
+                    <div class="ql-desc">매출채권 및 수금 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📉</div>
+                    <div class="ql-title">채무관리</div>
+                    <div class="ql-desc">매입채무 및 지급 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📃</div>
+                    <div class="ql-title">수표관리</div>
+                    <div class="ql-desc">수표 발행/수취 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">💳</div>
+                    <div class="ql-title">자금계획</div>
+                    <div class="ql-desc">자금 흐름 계획 수립</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📊</div>
+                    <div class="ql-title">예산관리</div>
+                    <div class="ql-desc">부서별 예산 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📝</div>
+                    <div class="ql-title">계약관리</div>
+                    <div class="ql-desc">전자계약 관리</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 관리 ===== -->
+        <section class="section" id="sec-management">
+            <div class="section-title">👤 관리 — 인사/급여</div>
+            <div class="quick-links">
+                <div class="quick-link">
+                    <div class="ql-icon">💸</div>
+                    <div class="ql-title">급여관리</div>
+                    <div class="ql-desc">급여 계산 및 대장</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">👥</div>
+                    <div class="ql-title">인사관리</div>
+                    <div class="ql-desc">사원정보 및 인사관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">🕐</div>
+                    <div class="ql-title">근태관리</div>
+                    <div class="ql-desc">출퇴근 및 근태 기록</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📄</div>
+                    <div class="ql-title">전자근로계약</div>
+                    <div class="ql-desc">근로계약서 전자 관리</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 세무 ===== -->
+        <section class="section" id="sec-tax">
+            <div class="section-title">📋 세무 — 원천/부가세/법인세</div>
+            <div class="quick-links">
+                <div class="quick-link">
+                    <div class="ql-icon">🏛️</div>
+                    <div class="ql-title">원천징수</div>
+                    <div class="ql-desc">급여 및 기타소득 원천징수</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">📋</div>
+                    <div class="ql-title">부가세 신고서</div>
+                    <div class="ql-desc">부가세 신고 및 관리</div>
+                </div>
+                <div class="quick-link">
+                    <div class="ql-icon">🏢</div>
+                    <div class="ql-title">법인세</div>
+                    <div class="ql-desc">법인세 신고 관리</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="erp-footer">
+        <p>© 2026 EDTC Corporation · Powered by Ecount ERP Open API V2 · 인팸 AI</p>
+    </footer>
+
+    <script>
+        // ===== State =====
+        let erpData = null;
+        let allSalesItems = [];
+        let chartBar = null;
+        let chartDoughnut = null;
+
+        // ===== Tab Navigation =====
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const target = tab.dataset.tab;
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+                document.getElementById('sec-' + target).classList.add('active');
+            });
+        });
+
+        // ===== Date Defaults =====
+        function setDefaultDates() {
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            const fmt = d => d.toISOString().split('T')[0];
+            ['inv1From'].forEach(id => { const el = document.getElementById(id); if (el) el.value = fmt(firstDay); });
+            ['inv1To'].forEach(id => { const el = document.getElementById(id); if (el) el.value = fmt(today); });
+        }
+
+        // ===== Format Helpers =====
+        function formatKRW(num) {
+            if (!num || isNaN(num)) return '₩0';
+            const absNum = Math.abs(num);
+            if (absNum >= 100000000) return (num < 0 ? '-' : '') + '₩' + (absNum / 100000000).toFixed(1) + '억';
+            if (absNum >= 10000) return (num < 0 ? '-' : '') + '₩' + (absNum / 10000).toFixed(0) + '만';
+            return '₩' + num.toLocaleString('ko-KR');
+        }
+        function formatNum(n) { return (n || 0).toLocaleString('ko-KR'); }
+
+        // ===== Animated Counter =====
+        function animateValue(el, end, prefix = '', suffix = '') {
+            const duration = 800;
+            const start = 0;
+            const startT = performance.now();
+            function step(now) {
+                const progress = Math.min((now - startT) / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(start + (end - start) * ease);
+                el.textContent = prefix + formatNum(current) + suffix;
+                if (progress < 1) requestAnimationFrame(step);
+                else el.textContent = prefix + formatNum(end) + suffix;
+            }
+            requestAnimationFrame(step);
+        }
+
+        // ===== Fetch ERP Data =====
+        async function fetchERPData() {
+            try {
+                const resp = await fetch('/api/erp/summary');
+                if (!resp.ok) throw new Error('API 오류');
+                return await resp.json();
+            } catch (e) {
+                console.error('ERP 데이터 로드 실패:', e);
+                return null;
+            }
+        }
+
+        // ===== Update UI =====
+        function updateDashboard(data) {
+            if (!data || !data.success) {
+                document.getElementById('statusBadge').className = 'status-badge disconnected';
+                document.getElementById('statusText').textContent = '연결 실패';
+                return;
+            }
+            erpData = data;
+
+            // Status
+            document.getElementById('statusBadge').className = 'status-badge connected';
+            document.getElementById('statusText').textContent = 'ERP 연결됨';
+
+            // KPIs
+            const salesAmt = data.sales?.totalAmt || 0;
+            const purchaseAmt = data.purchases?.totalAmt || 0;
+            const profit = salesAmt - purchaseAmt;
+            const profitRate = salesAmt > 0 ? ((profit / salesAmt) * 100).toFixed(1) : 0;
+
+            document.getElementById('kpiSalesAmt').textContent = formatKRW(salesAmt);
+            document.getElementById('kpiSalesCount').textContent = `${data.sales?.count || 0}건 거래`;
+            document.getElementById('kpiPurchaseAmt').textContent = formatKRW(purchaseAmt);
+            document.getElementById('kpiPurchaseCount').textContent = `${data.purchases?.count || 0}건 거래`;
+            document.getElementById('kpiItemCount').textContent = formatNum(data.inventory?.itemCount || 0);
+            document.getElementById('kpiInventoryAmt').textContent = `총 재고액: ${formatKRW(data.inventory?.totalAmt || 0)}`;
+            document.getElementById('kpiLowStock').textContent = formatNum(data.inventory?.lowStockItems?.length || 0);
+            document.getElementById('kpiProfit').textContent = formatKRW(profit);
+            document.getElementById('kpiProfitRate').textContent = `이익률: ${profitRate}%`;
+            document.getElementById('kpiLastUpdate').textContent = data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('ko-KR') : '-';
+            document.getElementById('kpiPeriod').textContent = `${data.period?.from || ''} ~ ${data.period?.to || ''}`;
+
+            // Sales Table
+            allSalesItems = data.sales?.raw || [];
+            renderSalesTable(allSalesItems);
+
+            // Low Stock
+            const lowStockItems = data.inventory?.lowStockItems || [];
+            if (lowStockItems.length > 0) {
+                document.getElementById('lowStockCard').style.display = 'block';
+                document.getElementById('lowStockBody').innerHTML = lowStockItems.map(item => `
+                <tr>
+                    <td>${item.code || '-'}</td>
+                    <td>${item.name || '-'}</td>
+                    <td class="amount ${item.qty <= 3 ? 'negative' : ''}">${item.qty}</td>
+                    <td><span class="badge ${item.qty <= 3 ? 'badge-red' : 'badge-gold'}">${item.qty <= 3 ? '긴급' : '부족'}</span></td>
+                </tr>
+            `).join('');
+            }
+
+            // Charts
+            updateCharts(data);
+        }
+
+        function renderSalesTable(items) {
+            const tbody = document.getElementById('salesBody');
+            document.getElementById('salesTableCount').textContent = `(${items.length}건)`;
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted);">데이터가 없습니다. API 연결 상태를 확인하세요.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.slice(0, 50).map((item, i) => `
+            <tr>
+                <td>${i + 1}</td>
+                <td>${item.IO_DATE || item.SL_DATE || item.날짜 || '-'}</td>
+                <td>${item.CUST_DES || item.거래처명 || '-'}</td>
+                <td>${item.PROD_DES || item.품목명 || '-'}</td>
+                <td class="amount">${formatNum(parseFloat(item.QTY || item.수량 || 0))}</td>
+                <td class="amount positive">${formatKRW(parseFloat(item.SUPPLY_AMT || item.TOT_AMT || item.금액 || 0))}</td>
+                <td><span class="badge badge-blue">완료</span></td>
+            </tr>
+        `).join('');
+        }
+
+        function filterSalesTable() {
+            const q = document.getElementById('salesSearch').value.toLowerCase();
+            if (!q) return renderSalesTable(allSalesItems);
+            const filtered = allSalesItems.filter(item => {
+                const str = JSON.stringify(item).toLowerCase();
+                return str.includes(q);
+            });
+            renderSalesTable(filtered);
+        }
+
+        // ===== Charts =====
+        function updateCharts(data) {
+            const salesAmt = data.sales?.totalAmt || 0;
+            const purchaseAmt = data.purchases?.totalAmt || 0;
+            const inventoryAmt = data.inventory?.totalAmt || 0;
+
+            // Bar Chart
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            if (chartBar) chartBar.destroy();
+            chartBar = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['매출', '매입', '재고액'],
+                    datasets: [{
+                        label: '금액 (원)',
+                        data: [salesAmt, purchaseAmt, inventoryAmt],
+                        backgroundColor: ['rgba(74,142,255,0.7)', 'rgba(52,211,153,0.7)', 'rgba(232,184,75,0.7)'],
+                        borderRadius: 8,
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => formatKRW(ctx.parsed.y) } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#6b7085', callback: v => formatKRW(v) } },
+                        x: { grid: { display: false }, ticks: { color: '#6b7085' } }
+                    }
+                }
+            });
+
+            // Doughnut Chart
+            const dCtx = document.getElementById('doughnutChart').getContext('2d');
+            if (chartDoughnut) chartDoughnut.destroy();
+            chartDoughnut = new Chart(dCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['매출', '매입', '재고'],
+                    datasets: [{
+                        data: [salesAmt || 1, purchaseAmt || 1, inventoryAmt || 1],
+                        backgroundColor: ['#4a8eff', '#34d399', '#e8b84b'],
+                        borderWidth: 0,
+                        spacing: 4,
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#9aa0b0', padding: 16, font: { size: 12 } } },
+                        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + formatKRW(ctx.parsed) } }
+                    }
+                }
+            });
+        }
+
+        // ===== Sub View Loading =====
+        function loadSubView(section, view) {
+            // Update sub-nav buttons
+            document.querySelectorAll(`#sec-${section === 'inv1' ? 'inventory1' : section} .sub-nav-btn`).forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function loadInventory1Data() {
+            // Re-fetch with date range
+            refreshData();
+        }
+
+        // ===== Refresh =====
+        async function refreshData() {
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            const data = await fetchERPData();
+            updateDashboard(data);
+            setTimeout(() => {
+                document.getElementById('loadingOverlay').classList.add('hidden');
+            }, 300);
+        }
+
+        // ===== Check ERP Status =====
+        async function checkStatus() {
+            try {
+                const resp = await fetch('/api/erp/status');
+                const data = await resp.json();
+                if (data.connected) {
+                    document.getElementById('statusBadge').className = 'status-badge connected';
+                    document.getElementById('statusText').textContent = 'ERP 연결됨';
+                } else {
+                    document.getElementById('statusBadge').className = 'status-badge disconnected';
+                    document.getElementById('statusText').textContent = data.configured ? '연결 중...' : 'API 미설정';
+                }
+            } catch (e) { }
+        }
+
+        // ===== Init =====
+        (async function init() {
+            setDefaultDates();
+            await refreshData();
+        })();
+
+        // Auto-refresh every 5 minutes
+        setInterval(refreshData, 5 * 60 * 1000);
+    </script>
+</body>
+
+</html>

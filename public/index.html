@@ -215,6 +215,136 @@
       transform: translateY(-1px);
       box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
     }
+
+    /* ─── 학습 모드 사이드 패널 (inbox 스타일) ─── */
+    .learn-side-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 520px;
+      height: 100vh;
+      background: var(--white);
+      border-left: 1px solid var(--border-color);
+      box-shadow: -8px 0 40px rgba(0, 0, 0, 0.12);
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .learn-side-panel.open {
+      transform: translateX(0);
+    }
+
+    .learn-panel-header {
+      height: 56px;
+      background: linear-gradient(135deg, #059669, #34d399);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+
+    .learn-panel-header .lp-icon {
+      font-size: 22px;
+    }
+
+    .learn-panel-header .lp-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .learn-panel-header .lp-sub {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    .learn-panel-header .lp-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .lp-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 500;
+      padding: 5px 10px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .lp-btn:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
+
+    .lp-close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .lp-close-btn:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .learn-panel-body {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .learn-panel-body iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .learn-panel-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.2);
+      z-index: 199;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .learn-panel-backdrop.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    @media (max-width: 768px) {
+      .learn-side-panel {
+        width: 100%;
+      }
+    }
+
+    @media (min-width: 769px) and (max-width: 1200px) {
+      .learn-side-panel {
+        width: 450px;
+      }
+    }
   </style>
   <script>
     // Service Worker 완전 제거 + 캐시 정리 (오프라인 오류 근본 차단)
@@ -269,6 +399,7 @@
       </div>
 
       <div class="sidebar-nav">
+        <h3 class="section-label">🤖 인팸 CS/CX AI</h3>
         <a href="javascript:void(0)" class="nav-item active" id="navChat" onclick="switchView('chat')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path>
@@ -280,29 +411,20 @@
             <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"></path>
             <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"></path>
           </svg>
-          <span>학습 모드</span>
+          <span>챗봇 밥주기</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" id="navUpload" onclick="switchView('upload')">
+        <a href="javascript:void(0)" class="nav-item" id="navUpload" onclick="switchView('upload')"
+          style="display:none">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"></path>
           </svg>
           <span>텍스트 업로드</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" id="navContent" onclick="switchView('content')">
+        <a href="javascript:void(0)" class="nav-item" id="navErp" onclick="switchView('erp')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 7l-7 5 7 5V7z"></path>
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+            <path d="M18 20V10M12 20V4M6 20v-6"></path>
           </svg>
-          <span>콘텐츠 자동화</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" id="navAdmin" onclick="switchView('admin')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path
-              d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z">
-            </path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-          <span>FAQ 관리</span>
+          <span>ERP 대시보드</span>
         </a>
       </div>
 
@@ -315,6 +437,13 @@
             <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path>
           </svg>
           <span>이미지 제작소</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" id="navContent" onclick="switchView('content')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 7l-7 5 7 5V7z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <span>콘텐츠 자동화</span>
         </a>
       </div>
 
@@ -511,25 +640,24 @@
 
     <!-- 인라인 뷰들 (같은 메인 영역에서 iframe으로 로드) -->
 
-    <!-- 학습 모드 뷰 -->
+    <!-- 학습 모드 뷰 (챗봇 페이지 표시) -->
     <div class="content-view" id="learnView">
       <header class="content-view-header">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-        <div class="cv-icon" style="background:linear-gradient(135deg,#059669,#34d399)">📖</div>
+        <div class="cv-icon" style="background:linear-gradient(135deg,#059669,#34d399)">📚</div>
         <div>
           <div class="cv-title">학습 모드</div>
-          <div class="cv-sub">대화 기반 AI 학습</div>
+          <div class="cv-sub">챗봇 학습 데이터 확인 및 관리</div>
         </div>
         <div class="cv-actions">
-          <button class="cv-external-btn" onclick="window.open('/learn.html','_blank')" title="새 창에서 열기">↗ 새 창</button>
+          <span class="cv-badge"
+            style="background:rgba(5,150,105,0.1);border-color:rgba(5,150,105,0.25);color:#059669;">🤖 AI 챗봇</span>
         </div>
       </header>
       <div class="content-iframe-wrap">
-        <iframe id="learnFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+        <iframe id="learnViewFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
       </div>
     </div>
-
-
 
     <!-- 텍스트 업로드 뷰 -->
     <div class="content-view" id="uploadView">
@@ -616,6 +744,47 @@
         <iframe id="designFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
       </div>
     </div>
+
+    <!-- ERP 대시보드 뷰 -->
+    <div class="content-view" id="erpView">
+      <header class="content-view-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="cv-icon" style="background:linear-gradient(135deg,#c9a96e,#f0d5a0)">📊</div>
+        <div>
+          <div class="cv-title">ERP 대시보드</div>
+          <div class="cv-sub">Ecount ERP 재고·매출·매입 현황</div>
+        </div>
+        <div class="cv-actions">
+          <span class="cv-badge"
+            style="background:rgba(176,141,87,0.1);border-color:rgba(176,141,87,0.25);color:#b08d57;">📊 Ecount
+            ERP</span>
+          <button class="cv-external-btn" onclick="window.open('/erp-dashboard.html','_blank')" title="새 창에서 열기">↗ 새
+            창</button>
+        </div>
+      </header>
+      <div class="content-iframe-wrap">
+        <iframe id="erpFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- 학습 모드 사이드 패널 (inbox 스타일) -->
+  <div class="learn-panel-backdrop" id="learnBackdrop" onclick="closeLearnPanel()"></div>
+  <div class="learn-side-panel" id="learnSidePanel">
+    <div class="learn-panel-header">
+      <span class="lp-icon">📖</span>
+      <div>
+        <div class="lp-title">학습 모드</div>
+        <div class="lp-sub">대화 기반 AI 학습</div>
+      </div>
+      <div class="lp-actions">
+        <button class="lp-btn" onclick="window.open('/learn.html','_blank')" title="새 창에서 열기">↗ 새 창</button>
+        <button class="lp-close-btn" onclick="closeLearnPanel()" title="닫기">✕</button>
+      </div>
+    </div>
+    <div class="learn-panel-body">
+      <iframe id="learnFrame" src=""></iframe>
+    </div>
   </div>
 
   <script src="chatbot.js"></script>
@@ -623,17 +792,54 @@
     // === 뷰 전환 (챗봇 ↔ 학습 ↔ 업로드 ↔ 콘텐츠 ↔ FAQ관리) ===
     const viewConfig = {
       chat: { viewId: null, navId: 'navChat', frameId: null, src: null },
-      learn: { viewId: 'learnView', navId: 'navLearn', frameId: 'learnFrame', src: '/learn.html' },
+      learn: { viewId: 'learnView', navId: 'navLearn', frameId: 'learnViewFrame', src: '/learn.html' },
       upload: { viewId: 'uploadView', navId: 'navUpload', frameId: 'uploadFrame', src: '/upload.html' },
       content: { viewId: 'contentView', navId: 'navContent', frameId: 'contentFrame', src: null },
       admin: { viewId: 'adminView', navId: 'navAdmin', frameId: 'adminFrame', src: '/admin.html' },
       design: { viewId: 'designView', navId: 'navDesign', frameId: 'designFrame', src: '/design-studio.html' },
+      erp: { viewId: 'erpView', navId: 'navErp', frameId: 'erpFrame', src: '/erp-dashboard.html' },
     };
     let contentLoaded = false;
+    let learnPanelLoaded = false;
     const loadedFrames = new Set();
+
+    // === 학습 모드 사이드 패널 토글 ===
+    function openLearnPanel() {
+      const panel = document.getElementById('learnSidePanel');
+      const backdrop = document.getElementById('learnBackdrop');
+      panel.classList.add('open');
+      backdrop.classList.add('show');
+      document.getElementById('navLearn').classList.add('active');
+
+      // 첫 로드 시에만 iframe src 설정
+      if (!learnPanelLoaded) {
+        document.getElementById('learnFrame').src = '/learn.html';
+        learnPanelLoaded = true;
+      }
+    }
+
+    function closeLearnPanel() {
+      const panel = document.getElementById('learnSidePanel');
+      const backdrop = document.getElementById('learnBackdrop');
+      panel.classList.remove('open');
+      backdrop.classList.remove('show');
+      document.getElementById('navLearn').classList.remove('active');
+    }
+
+    function toggleLearnPanel() {
+      const panel = document.getElementById('learnSidePanel');
+      if (panel.classList.contains('open')) {
+        closeLearnPanel();
+      } else {
+        openLearnPanel();
+      }
+    }
 
     function switchView(view) {
       const chatMain = document.querySelector('.chat-main');
+
+      // 학습 패널 닫기 (다른 뷰로 전환 시)
+      closeLearnPanel();
 
       // 모든 뷰 숨기기
       document.querySelectorAll('.content-view').forEach(v => v.classList.remove('view-active'));

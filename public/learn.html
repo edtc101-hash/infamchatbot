@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>인팸 AI 학습 모드 | 관리자</title>
+    <title>인팸 AI 학습 모드</title>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <style>
@@ -15,16 +15,20 @@
             --green: #22c55e;
             --green-light: #dcfce7;
             --red: #ef4444;
-            --bg: #f8fafc;
+            --bg: #fafaf9;
             --white: #ffffff;
+            --gray-50: #f8fafc;
             --gray-100: #f1f5f9;
             --gray-200: #e2e8f0;
             --gray-300: #cbd5e1;
             --gray-400: #94a3b8;
+            --gray-500: #64748b;
             --gray-600: #475569;
             --gray-700: #334155;
-            --radius: 12px;
-            --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            --radius: 16px;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, .06);
+            --shadow: 0 4px 16px rgba(0, 0, 0, .08);
+            --shadow-lg: 0 12px 40px rgba(0, 0, 0, .12);
         }
 
         * {
@@ -34,22 +38,26 @@
         }
 
         body {
-            font-family: 'Pretendard', sans-serif;
+            font-family: 'Pretendard', -apple-system, sans-serif;
             background: var(--bg);
             color: var(--primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
-        /* 헤더 */
+        /* ─────────── 헤더 ─────────── */
         .header {
             background: var(--white);
             border-bottom: 1px solid var(--gray-200);
-            padding: 16px 32px;
+            padding: 0 32px;
+            height: 56px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            flex-shrink: 0;
+            z-index: 50;
         }
 
         .header-left {
@@ -59,15 +67,11 @@
         }
 
         .header-logo {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 800;
-            color: var(--gold);
-        }
-
-        .header-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--primary);
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .header-badge {
@@ -75,23 +79,25 @@
             background: var(--green-light);
             color: #16a34a;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
         }
 
         .header-right {
             display: flex;
             gap: 8px;
+            align-items: center;
         }
 
         .header-btn {
-            padding: 8px 16px;
+            padding: 7px 14px;
             border: 1px solid var(--gray-200);
-            border-radius: 8px;
+            border-radius: 10px;
             background: var(--white);
             cursor: pointer;
             font-family: inherit;
-            font-size: 13px;
+            font-size: 12px;
+            font-weight: 500;
             color: var(--gray-600);
             text-decoration: none;
             transition: all .2s;
@@ -102,64 +108,140 @@
             color: var(--gold);
         }
 
-        /* 레이아웃 */
-        .layout {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            height: calc(100vh - 60px);
-        }
-
-        /* 왼쪽: 학습 채팅 */
-        .learn-chat {
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--gray-200);
-        }
-
-        .chat-header-bar {
-            padding: 16px 20px;
-            background: var(--white);
-            border-bottom: 1px solid var(--gray-200);
-        }
-
-        .chat-header-bar h2 {
-            font-size: 16px;
-            font-weight: 700;
+        /* 학습 지식 토글 버튼 */
+        .knowledge-toggle-btn {
+            padding: 7px 14px;
+            border: 1px solid var(--gold);
+            border-radius: 10px;
+            background: rgba(176, 141, 87, .06);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gold);
+            transition: all .2s;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 5px;
         }
 
-        .chat-header-bar p {
-            font-size: 13px;
-            color: var(--gray-400);
-            margin-top: 4px;
+        .knowledge-toggle-btn:hover {
+            background: rgba(176, 141, 87, .12);
+        }
+
+        .knowledge-toggle-btn.active {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #fff;
+            border-color: transparent;
+        }
+
+        /* ─────────── 메인 영역 ─────────── */
+        .main-wrap {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ─── 채팅 영역 (검색 중심) ─── */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 860px;
+            margin: 0 auto;
+            width: 100%;
+            transition: max-width .3s;
         }
 
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 32px 24px 24px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            background: var(--bg);
+            gap: 16px;
         }
 
+        /* 웰컴 카드 */
+        .welcome-card {
+            text-align: center;
+            padding: 60px 40px 40px;
+        }
+
+        .welcome-card__icon {
+            font-size: 52px;
+            margin-bottom: 16px;
+        }
+
+        .welcome-card__title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .welcome-card__sub {
+            font-size: 14px;
+            color: var(--gray-500);
+            line-height: 1.7;
+            margin-bottom: 28px;
+        }
+
+        .welcome-suggestions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .suggestion-chip {
+            padding: 10px 18px;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 24px;
+            font-size: 13px;
+            color: var(--gray-600);
+            cursor: pointer;
+            transition: all .2s;
+            font-family: inherit;
+        }
+
+        .suggestion-chip:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: rgba(176, 141, 87, .04);
+            transform: translateY(-1px);
+        }
+
+        /* 메시지 버블 */
         .msg {
             max-width: 85%;
-            padding: 12px 16px;
-            border-radius: var(--radius);
+            padding: 14px 18px;
+            border-radius: 20px;
             font-size: 14px;
             line-height: 1.7;
             word-break: break-word;
+            animation: fadeUp .3s ease;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .msg.user {
             align-self: flex-end;
-            background: linear-gradient(135deg, #c9a96e, #e8c47a);
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
             color: #fff;
-            border-bottom-right-radius: 4px;
+            border-bottom-right-radius: 6px;
         }
 
         .msg.bot {
@@ -167,211 +249,151 @@
             background: var(--white);
             border: 1px solid var(--gray-200);
             color: var(--primary);
-            border-bottom-left-radius: 4px;
+            border-bottom-left-radius: 6px;
+            box-shadow: var(--shadow-sm);
         }
 
         .msg .learn-badge {
             display: inline-block;
-            margin-top: 8px;
-            padding: 3px 8px;
+            margin-top: 10px;
+            padding: 4px 10px;
             background: var(--green-light);
             color: #16a34a;
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 11px;
             font-weight: 600;
         }
 
-        .chat-input-area {
-            padding: 16px 20px;
-            background: var(--white);
-            border-top: 1px solid var(--gray-200);
-        }
-
-        .chat-input-wrap {
+        /* ─── 하단 입력창 (검색바 스타일) ─── */
+        .input-dock {
+            padding: 16px 24px 24px;
             display: flex;
-            gap: 8px;
+            flex-direction: column;
+            gap: 10px;
         }
 
-        .chat-input-wrap textarea {
-            flex: 1;
-            border: 1px solid var(--gray-200);
-            border-radius: var(--radius);
-            padding: 12px 16px;
-            font-family: inherit;
-            font-size: 14px;
-            resize: none;
-            outline: none;
-            max-height: 100px;
-            transition: border-color .2s;
+        .input-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 18px;
+            padding: 6px 6px 6px 20px;
+            transition: border-color .2s, box-shadow .2s;
+            box-shadow: var(--shadow);
         }
 
-        .chat-input-wrap textarea:focus {
+        .input-box:focus-within {
             border-color: var(--gold);
+            box-shadow: 0 0 0 4px rgba(176, 141, 87, .12), var(--shadow);
         }
 
-        .chat-input-wrap textarea::placeholder {
-            color: var(--gray-400);
-        }
-
-        .send-btn {
-            padding: 12px 20px;
-            background: linear-gradient(135deg, var(--gold), var(--gold-light));
-            color: #fff;
-            border: none;
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-family: inherit;
-            font-weight: 600;
-            font-size: 14px;
-            white-space: nowrap;
-            transition: opacity .2s;
-        }
-
-        .send-btn:hover {
-            opacity: .9;
-        }
-
-        .send-btn:disabled {
-            opacity: .5;
-            cursor: not-allowed;
-        }
-
-        /* 탭 UI */
-        .tab-bar {
-            display: flex;
-            border-bottom: 1px solid var(--gray-200);
-            background: var(--white);
-        }
-
-        .tab-btn {
+        .input-box textarea {
             flex: 1;
-            padding: 12px 16px;
             border: none;
-            background: none;
+            outline: none;
             font-family: inherit;
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 15px;
+            resize: none;
+            max-height: 120px;
+            min-height: 24px;
+            line-height: 1.5;
+            background: transparent;
+        }
+
+        .input-box textarea::placeholder {
             color: var(--gray-400);
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .bulk-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
             cursor: pointer;
-            border-bottom: 2px solid transparent;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: all .2s;
         }
 
-        .tab-btn.active {
-            color: var(--gold);
-            border-bottom-color: var(--gold);
-            font-weight: 600;
-        }
-
-        .tab-btn:hover {
-            color: var(--gold);
-        }
-
-        .tab-content {
-            display: none;
-            flex-direction: column;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        .tab-content.active {
-            display: flex;
-        }
-
-        /* 대화 업로드 영역 */
-        .upload-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            gap: 16px;
-            overflow-y: auto;
-        }
-
-        .upload-desc {
-            font-size: 14px;
-            color: var(--gray-600);
-            line-height: 1.6;
-            background: rgba(176, 141, 87, .04);
-            border: 1px solid rgba(176, 141, 87, .12);
-            border-radius: var(--radius);
-            padding: 14px 16px;
-        }
-
-        .upload-textarea {
-            flex: 1;
-            min-height: 200px;
-            padding: 16px;
-            border: 2px dashed var(--gray-200);
-            border-radius: var(--radius);
-            font-family: inherit;
-            font-size: 13px;
-            line-height: 1.7;
-            resize: none;
-            outline: none;
-            background: var(--white);
-            transition: border-color .2s;
-        }
-
-        .upload-textarea:focus {
+        .bulk-btn:hover {
+            background: rgba(176, 141, 87, .08);
             border-color: var(--gold);
-            border-style: solid;
         }
 
-        .upload-textarea::placeholder {
-            color: var(--gray-300);
-        }
-
-        .upload-btn-wrap {
+        .send-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            border: none;
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #fff;
+            cursor: pointer;
+            font-size: 18px;
             display: flex;
-            gap: 8px;
-            justify-content: flex-end;
-        }
-
-        .upload-result {
-            padding: 14px 16px;
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: var(--radius);
-            font-size: 14px;
-            line-height: 1.7;
-            color: var(--primary);
-            display: none;
-        }
-
-        .upload-result.show {
-            display: block;
-        }
-
-        .upload-count {
-            display: inline-flex;
             align-items: center;
-            gap: 4px;
-            padding: 4px 10px;
-            background: var(--green-light);
-            color: #16a34a;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 8px;
+            justify-content: center;
+            transition: all .2s;
+            box-shadow: 0 4px 12px rgba(176, 141, 87, .3);
         }
 
-        /* 오른쪽: 학습 데이터 관리 */
-        .learn-data {
+        .send-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(176, 141, 87, .4);
+        }
+
+        .send-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .input-hint {
+            font-size: 11px;
+            color: var(--gray-400);
+            text-align: center;
+        }
+
+        /* ─────────── 학습 지식 사이드 패널 ─────────── */
+        .knowledge-panel {
+            width: 420px;
+            background: var(--white);
+            border-left: 1px solid var(--gray-200);
             display: flex;
             flex-direction: column;
+            transform: translateX(100%);
+            transition: transform .35s cubic-bezier(.4, 0, .2, 1);
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            z-index: 40;
+            box-shadow: -8px 0 30px rgba(0, 0, 0, .06);
         }
 
-        .data-header {
-            padding: 16px 20px;
-            background: var(--white);
+        .knowledge-panel.open {
+            transform: translateX(0);
+        }
+
+        .kp-header {
+            padding: 18px 20px;
             border-bottom: 1px solid var(--gray-200);
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
 
-        .data-header h2 {
+        .kp-header h2 {
             font-size: 16px;
             font-weight: 700;
             display: flex;
@@ -379,51 +401,73 @@
             gap: 8px;
         }
 
-        .data-stats {
-            font-size: 13px;
+        .kp-stats {
+            font-size: 12px;
             color: var(--gray-400);
+            font-weight: 400;
         }
 
-        .data-search {
-            padding: 12px 20px;
+        .kp-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
             background: var(--white);
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s;
+        }
+
+        .kp-close:hover {
+            background: #fef2f2;
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .kp-search {
+            padding: 12px 20px;
             border-bottom: 1px solid var(--gray-200);
         }
 
-        .data-search input {
+        .kp-search input {
             width: 100%;
             padding: 10px 14px;
             border: 1px solid var(--gray-200);
-            border-radius: 8px;
+            border-radius: 10px;
             font-family: inherit;
             font-size: 13px;
             outline: none;
+            transition: border-color .2s;
         }
 
-        .data-search input:focus {
+        .kp-search input:focus {
             border-color: var(--gold);
         }
 
-        .data-list {
+        .kp-list {
             flex: 1;
             overflow-y: auto;
-            padding: 12px 20px;
+            padding: 12px 16px;
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
 
+        /* 학습 카드 */
         .learn-card {
-            background: var(--white);
+            background: var(--gray-50);
             border: 1px solid var(--gray-200);
-            border-radius: var(--radius);
+            border-radius: 14px;
             padding: 14px 16px;
             transition: all .2s;
         }
 
         .learn-card:hover {
             border-color: var(--gold);
-            box-shadow: var(--shadow);
+            box-shadow: var(--shadow-sm);
         }
 
         .learn-card-top {
@@ -435,9 +479,9 @@
 
         .learn-card-cat {
             padding: 3px 8px;
-            background: rgba(176, 141, 87, .08);
+            background: rgba(176, 141, 87, .1);
             color: var(--gold);
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 11px;
             font-weight: 600;
         }
@@ -468,11 +512,11 @@
         }
 
         .learn-card-kw {
-            padding: 2px 6px;
+            padding: 2px 7px;
             background: var(--gray-100);
-            border-radius: 4px;
-            font-size: 11px;
-            color: var(--gray-600);
+            border-radius: 6px;
+            font-size: 10px;
+            color: var(--gray-500);
         }
 
         .learn-card-actions {
@@ -489,8 +533,8 @@
             background: var(--white);
             cursor: pointer;
             font-family: inherit;
-            font-size: 12px;
-            color: var(--gray-600);
+            font-size: 11px;
+            color: var(--gray-500);
             transition: all .2s;
         }
 
@@ -507,93 +551,565 @@
         }
 
         .empty-state .emoji {
-            font-size: 48px;
-            margin-bottom: 12px;
+            font-size: 40px;
+            margin-bottom: 10px;
         }
 
         .empty-state p {
-            font-size: 14px;
+            font-size: 13px;
         }
 
-        /* 로그인 */
-        .login-overlay {
+        /* ─── 대량등록 모달 ─── */
+        .bulk-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, .3);
+            background: rgba(0, 0, 0, .45);
+            backdrop-filter: blur(6px);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .3s;
         }
 
-        .login-box {
+        .bulk-overlay.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .bulk-modal {
             background: var(--white);
-            border-radius: 16px;
-            padding: 32px;
-            width: 360px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, .12);
+            border-radius: 20px;
+            width: 600px;
+            max-width: 95vw;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
         }
 
-        .login-box h2 {
-            font-size: 18px;
+        .bulk-modal__header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .bulk-modal__header h2 {
+            font-size: 17px;
             font-weight: 700;
-            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .login-box p {
-            font-size: 13px;
-            color: var(--gray-400);
-            margin-bottom: 20px;
-        }
-
-        .login-box input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid var(--gray-200);
+        .modal-close {
+            width: 32px;
+            height: 32px;
             border-radius: 8px;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s;
+        }
+
+        .modal-close:hover {
+            background: #fef2f2;
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .bulk-modal__body {
+            padding: 20px 24px;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .bulk-modal__desc {
+            font-size: 14px;
+            color: var(--gray-600);
+            line-height: 1.6;
+            background: rgba(176, 141, 87, .04);
+            border: 1px solid rgba(176, 141, 87, .12);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+        }
+
+        .bulk-modal__textarea {
+            min-height: 200px;
+            padding: 16px;
+            border: 2px dashed var(--gray-200);
+            border-radius: var(--radius);
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1.7;
+            resize: vertical;
+            outline: none;
+            background: var(--white);
+            transition: border-color .2s;
+        }
+
+        .bulk-modal__textarea:focus {
+            border-color: var(--gold);
+            border-style: solid;
+        }
+
+        .bulk-modal__result {
+            padding: 14px 16px;
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            font-size: 14px;
+            line-height: 1.7;
+            display: none;
+        }
+
+        .bulk-modal__result.show {
+            display: block;
+        }
+
+        .bulk-modal__footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 22px;
+            border-radius: 12px;
             font-family: inherit;
             font-size: 14px;
-            outline: none;
-            margin-bottom: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            border: none;
         }
 
-        .login-box input:focus {
+        .modal-btn--cancel {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+
+        .modal-btn--cancel:hover {
+            background: var(--gray-200);
+        }
+
+        .modal-btn--submit {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(176, 141, 87, .3);
+        }
+
+        .modal-btn--submit:hover {
+            opacity: .9;
+            transform: translateY(-1px);
+        }
+
+        .modal-btn--submit:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .upload-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: var(--green-light);
+            color: #16a34a;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        /* 모달 탭 */
+        .modal-tab {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-400);
+            transition: all .2s;
+            border-bottom: 2px solid transparent;
+        }
+
+        .modal-tab:hover {
+            color: var(--gray-600);
+        }
+
+        .modal-tab.active {
+            color: var(--gold);
+            border-bottom-color: var(--gold);
+        }
+
+        /* 모달 내 드롭존 (파일 탭용) */
+        .modal-dropzone {
+            border: 2px dashed var(--gray-200);
+            border-radius: var(--radius);
+            padding: 28px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+            font-size: 14px;
+            color: var(--gray-500);
+            background: var(--gray-50);
+        }
+
+        .modal-dropzone:hover,
+        .modal-dropzone.dragover {
+            border-color: var(--gold);
+            background: rgba(176, 141, 87, .04);
+        }
+
+        .modal-file-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: var(--gray-100);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--gray-600);
+        }
+
+        .modal-file-tag .remove {
+            cursor: pointer;
+            opacity: .5;
+            font-size: 11px;
+        }
+
+        .modal-file-tag .remove:hover {
+            opacity: 1;
+            color: var(--red);
+        }
+
+        /* 추출 데이터 미리보기 팝업 */
+        .qa-preview-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .5);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .qa-preview-overlay.show {
+            display: flex;
+        }
+
+        .qa-preview {
+            background: #fff;
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 680px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .2);
+            overflow: hidden;
+        }
+
+        .qa-preview__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--gray-100);
+            background: var(--gray-50);
+        }
+
+        .qa-preview__header h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .qa-preview__header .close-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--gray-500);
+            padding: 4px;
+        }
+
+        .qa-preview__body {
+            overflow-y: auto;
+            padding: 16px 24px;
+            flex: 1;
+        }
+
+        .qa-card {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-100);
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-bottom: 10px;
+            transition: border-color .2s;
+        }
+
+        .qa-card:hover {
             border-color: var(--gold);
         }
 
-        .login-box button {
-            width: 100%;
-            padding: 12px;
+        .qa-card__category {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: rgba(176, 141, 87, .12);
+            color: var(--gold);
+            margin-bottom: 6px;
+        }
+
+        .qa-card__q {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 6px;
+        }
+
+        .qa-card__a {
+            font-size: 13px;
+            color: var(--gray-500);
+            line-height: 1.5;
+        }
+
+        .qa-card__keywords {
+            margin-top: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .qa-card__keywords span {
+            font-size: 10px;
+            padding: 1px 6px;
+            background: var(--gray-100);
+            border-radius: 4px;
+            color: var(--gray-400);
+        }
+
+        .view-data-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            margin-top: 10px;
+            background: linear-gradient(135deg, var(--primary), var(--gray-700));
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .2s;
+        }
+
+        .view-data-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
+        }
+
+        /* 파일 업로드 영역 (사이드 패널 내) */
+        .upload-bar {
+            background: linear-gradient(135deg, var(--primary), var(--gray-700));
+            color: #fff;
+            flex-shrink: 0;
+            overflow: hidden;
+            border-radius: 0;
+        }
+
+        .upload-bar__inner {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .upload-bar__toggle {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex: 1;
+            padding: 0;
+        }
+
+        .upload-bar__toggle:hover {
+            opacity: .85;
+        }
+
+        .upload-bar__file-count {
+            background: rgba(255, 255, 255, .2);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            display: none;
+        }
+
+        .upload-bar__file-count.show {
+            display: inline-block;
+        }
+
+        .upload-bar__submit {
+            padding: 6px 14px;
             background: linear-gradient(135deg, var(--gold), var(--gold-light));
             color: #fff;
             border: none;
             border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
             cursor: pointer;
             font-family: inherit;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .login-error {
-            color: var(--red);
-            font-size: 12px;
-            margin-bottom: 8px;
+            box-shadow: 0 2px 8px rgba(176, 141, 87, .3);
+            transition: all .2s;
+            white-space: nowrap;
             display: none;
         }
 
+        .upload-bar__submit.show {
+            display: block;
+        }
+
+        .upload-bar__submit:hover {
+            transform: translateY(-1px);
+        }
+
+        .upload-bar__submit:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .upload-bar__drop {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height .35s ease, padding .35s ease;
+            padding: 0 16px;
+        }
+
+        .upload-bar__drop.open {
+            max-height: 200px;
+            padding: 0 16px 12px;
+        }
+
+        .upload-bar__dropzone {
+            border: 2px dashed rgba(255, 255, 255, .25);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+            font-size: 12px;
+            color: rgba(255, 255, 255, .7);
+        }
+
+        .upload-bar__dropzone:hover,
+        .upload-bar__dropzone.dragover {
+            border-color: var(--gold);
+            background: rgba(255, 255, 255, .05);
+        }
+
+        .upload-bar__dropzone input {
+            display: none;
+        }
+
+        .upload-bar__files {
+            margin-top: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .upload-file-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 8px;
+            background: rgba(255, 255, 255, .12);
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .upload-file-tag .remove {
+            cursor: pointer;
+            opacity: .6;
+        }
+
+        .upload-file-tag .remove:hover {
+            opacity: 1;
+        }
+
+        .upload-bar__status {
+            padding: 0 16px 8px;
+            font-size: 11px;
+            display: none;
+        }
+
+        .upload-bar__status.show {
+            display: block;
+        }
+
+        /* 반응형 */
         @media(max-width:768px) {
-            .layout {
-                grid-template-columns: 1fr;
+            .header {
+                padding: 0 16px;
             }
 
-            .learn-chat {
-                height: 50vh;
-                border-right: none;
-                border-bottom: 1px solid var(--gray-200);
+            .header-right .header-btn {
+                display: none;
             }
 
-            .learn-data {
-                height: 50vh;
+            .chat-messages {
+                padding: 20px 12px;
+            }
+
+            .input-dock {
+                padding: 12px;
+            }
+
+            .knowledge-panel {
+                width: 100%;
+            }
+
+            .welcome-card {
+                padding: 40px 20px 30px;
+            }
+
+            .welcome-card__title {
+                font-size: 18px;
             }
         }
     </style>
@@ -601,130 +1117,330 @@
 
 <body>
 
-    <!-- 로그인 -->
-    <div class="login-overlay" id="loginOverlay">
-        <div class="login-box">
-            <h2>🧠 학습 모드 로그인</h2>
-            <p>관리자 비밀번호를 입력하세요</p>
-            <div class="login-error" id="loginError">비밀번호가 올바르지 않습니다.</div>
-            <input type="password" id="loginPw" placeholder="비밀번호" onkeypress="if(event.key==='Enter')doLogin()">
-            <button onclick="doLogin()">로그인</button>
-        </div>
-    </div>
-
     <!-- 헤더 -->
     <div class="header">
         <div class="header-left">
-            <span class="header-logo">🧠 InFam</span>
-            <span class="header-title">AI 학습 모드</span>
+            <span class="header-logo">🧠 InFam AI 학습</span>
             <span class="header-badge" id="totalBadge">0건 학습됨</span>
         </div>
         <div class="header-right">
-            <a href="/" class="header-btn">💬 챗봇으로</a>
-            <a href="/upload.html" class="header-btn">📄 텍스트 업로드</a>
-            <a href="/content.html" class="header-btn">🎬 콘텐츠 자동화</a>
-            <a href="/admin.html" class="header-btn">⚙️ FAQ 관리</a>
+            <button class="knowledge-toggle-btn" id="knowledgeToggle" onclick="toggleKnowledge()">
+                📚 학습된 지식 <span id="knowledgeCount"></span>
+            </button>
+            <button class="header-btn" onclick="openBulkModal('file')">📄 파일로 학습</button>
         </div>
     </div>
 
-    <!-- 메인 레이아웃 -->
-    <div class="layout">
-        <!-- 왼쪽: 학습 영역 (탭) -->
-        <div class="learn-chat">
-            <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchTab('chat')">채팅 학습</button>
-                <button class="tab-btn" onclick="switchTab('upload')">대화 업로드</button>
-            </div>
 
-            <!-- 탭1: 채팅 학습 -->
-            <div class="tab-content active" id="tabChat">
-                <div class="chat-header-bar">
-                    <h2>AI에게 가르치기</h2>
-                    <p>시공 문제, 제품 특성, 주의사항 등을 자연스럽게 대화하며 가르쳐주세요</p>
-                </div>
-                <div class="chat-messages" id="chatMessages">
-                    <div class="msg bot">
-                        안녕하세요! 관리자님<br><br>
-                        저에게 인팸 제품에 대한 <strong>시공 노하우, 문제 해결법, 제품 특성</strong> 등을 가르쳐주세요.<br><br>
-                        예시:<br>
-                        • "소프트 스톤 시공할 때 기포가 생기면 스크래퍼로 밀어내야 해"<br>
-                        • "WPC 월패널은 습기가 많은 곳에서는 방습 처리를 먼저 해야 해"<br>
-                        • "카빙 스톤 뒷면에 본드를 바를 때 지그재그로 발라야 접착력이 좋아"<br><br>
-                        가르쳐주신 내용은 자동으로 학습되어 고객 응대에 활용됩니다!
+
+    <!-- 메인 -->
+    <div class="main-wrap">
+        <!-- 채팅 영역 -->
+        <div class="chat-area">
+            <div class="chat-messages" id="chatMessages">
+                <!-- 웰컴 카드 -->
+                <div class="welcome-card" id="welcomeCard">
+                    <div class="welcome-card__icon">🧠</div>
+                    <div class="welcome-card__title">AI에게 지식을 가르쳐주세요</div>
+                    <div class="welcome-card__sub">
+                        시공 노하우, 제품 특성, 문제 해결법 등을 대화로 알려주시면<br>
+                        AI가 자동으로 학습하여 고객 응대에 활용합니다.
                     </div>
-                </div>
-                <div class="chat-input-area">
-                    <div class="chat-input-wrap">
-                        <textarea id="learnInput" rows="2" placeholder="AI에게 가르칠 내용을 입력하세요..."
-                            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendLearn();}"></textarea>
-                        <button class="send-btn" id="sendBtn" onclick="sendLearn()">학습 전송</button>
+                    <div class="welcome-suggestions">
+                        <button class="suggestion-chip" onclick="useSuggestion(this)">소프트 스톤 시공 시 기포가 생기면 스크래퍼로 밀어내야
+                            해</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)">WPC 월패널 습기 방습 처리 방법</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)">카빙 스톤 본드 도포 노하우</button>
                     </div>
                 </div>
             </div>
 
-            <!-- 탭2: 대화 업로드 -->
-            <div class="tab-content" id="tabUpload">
-                <div class="upload-area">
-                    <div class="upload-desc">
-                        고객과 나눈 대화를 그대로 붙여넣기 하세요.<br>
-                        AI가 대화 속에서 <strong>유용한 Q&A를 자동으로 추출</strong>하여 학습합니다.
-                    </div>
-                    <textarea class="upload-textarea" id="convTextarea" placeholder="예시:
-고객: 소프트 스톤 시공 후 모서리 부분이 들뜨는데 어떻게 해야 하나요?
-나: 모서리 부분은 본드를 추가로 도포하고 마스킹 테이프로 12시간 고정하면 됩니다.
-고객: 감사합니다. 그리고 커터기로 잘라도 되나요?
-나: 네, 아트나이프로 가볍게 자르면 깔끔하게 커팅됩니다.
-
-이런 식으로 대화를 붙여넣기 해주세요."></textarea>
-                    <div class="upload-result" id="uploadResult"></div>
-                    <div class="upload-btn-wrap">
-                        <button class="send-btn" id="uploadBtn" onclick="analyzeConversation()">대화 분석 & 학습</button>
+            <!-- 하단 입력 -->
+            <div class="input-dock">
+                <div class="input-box">
+                    <textarea id="learnInput" rows="1" placeholder="AI에게 가르칠 지식을 입력하세요..."
+                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendLearn();}"
+                        oninput="autoResizeTextarea(this)"></textarea>
+                    <div class="input-actions">
+                        <button class="bulk-btn" title="대량 등록" onclick="openBulkModal()">📤</button>
+                        <button class="send-btn" id="sendBtn" onclick="sendLearn()">➤</button>
                     </div>
                 </div>
+                <div class="input-hint">Enter로 전송 · Shift+Enter 줄바꿈 · 📤 대량 등록으로 대화 일괄 학습</div>
             </div>
         </div>
 
-        <!-- 오른쪽: 학습 데이터 관리 -->
-        <div class="learn-data">
-            <div class="data-header">
-                <h2>📚 학습된 지식</h2>
-                <span class="data-stats" id="dataStats">총 0건</span>
+        <!-- 학습 지식 사이드 패널 -->
+        <div class="knowledge-panel" id="knowledgePanel">
+            <div class="kp-header">
+                <h2>📚 학습된 지식 <span class="kp-stats" id="dataStats">총 0건</span></h2>
+                <button class="kp-close" onclick="toggleKnowledge()">✕</button>
             </div>
-            <div class="data-search">
+            <div class="kp-search">
                 <input type="text" id="searchInput" placeholder="🔍 학습 데이터 검색..." oninput="loadLearnedData()">
             </div>
-            <div class="data-list" id="dataList">
+            <!-- 파일 업로드 영역 (사이드 패널 내) -->
+            <div class="upload-bar" id="uploadBar">
+                <div class="upload-bar__inner">
+                    <button class="upload-bar__toggle" onclick="toggleUploadDrop()">
+                        📄 파일 업로드 학습 <span style="opacity:.5;font-size:11px">▼</span>
+                    </button>
+                    <span class="upload-bar__file-count" id="ubFileCount">0개</span>
+                    <button class="upload-bar__submit" id="ubSubmitBtn" onclick="uploadFilesLearn()">🧠 학습하기</button>
+                </div>
+                <div class="upload-bar__drop" id="ubDrop">
+                    <div class="upload-bar__dropzone" id="ubDropzone"
+                        onclick="document.getElementById('ubFileInput').click()">
+                        📥 파일을 드래그하거나 클릭<br>
+                        <small>.txt, .pdf, .xlsx, .csv (최대 10MB)</small>
+                        <input type="file" id="ubFileInput" multiple accept=".txt,.pdf,.xlsx,.xls,.csv"
+                            onchange="handleUploadFiles(this.files)">
+                    </div>
+                    <div class="upload-bar__files" id="ubFileList"></div>
+                </div>
+                <div class="upload-bar__status" id="ubStatus"></div>
+            </div>
+            <div class="kp-list" id="dataList">
                 <div class="empty-state">
                     <div class="emoji">🧠</div>
-                    <p>아직 학습된 지식이 없습니다<br>왼쪽에서 AI에게 가르쳐주세요!</p>
+                    <p>아직 학습된 지식이 없습니다<br>왼쪽 채팅으로 AI에게 가르쳐주세요!</p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 대량등록 / 파일학습 통합 모달 -->
+    <div class="bulk-overlay" id="bulkOverlay">
+        <div class="bulk-modal">
+            <div class="bulk-modal__header">
+                <h2>🧠 AI 학습 등록</h2>
+                <button class="modal-close" onclick="closeBulkModal()">✕</button>
+            </div>
+            <!-- 탭 바 -->
+            <div style="display:flex;border-bottom:1px solid var(--gray-200);">
+                <button class="modal-tab active" id="modalTabText" onclick="switchModalTab('text')">💬 대화 입력</button>
+                <button class="modal-tab" id="modalTabFile" onclick="switchModalTab('file')">📄 파일 업로드</button>
+            </div>
+            <!-- 탭1: 대화 입력 -->
+            <div class="bulk-modal__body" id="modalBodyText">
+                <div class="bulk-modal__desc">
+                    고객과 나눈 대화를 그대로 붙여넣기 하세요.<br>
+                    AI가 대화 속에서 <strong>유용한 Q&amp;A를 자동으로 추출</strong>하여 학습합니다.
+                </div>
+                <textarea class="bulk-modal__textarea" id="convTextarea" placeholder="예시:
+고객: 소프트 스톤 시공 후 모서리 부분이 들뜨는데 어떻게 해야 하나요?
+나: 모서리 부분은 본드를 추가로 도포하고 마스킹 테이프로 12시간 고정하면 됩니다.
+고객: 감사합니다. 그리고 커터기로 잘라도 되나요?
+나: 네, 아트나이프로 가볝게 자르면 깔끔하게 커팅됩니다.
+
+이런 식으로 대화를 붙여넣기 해주세요."></textarea>
+                <div class="bulk-modal__result" id="uploadResult"></div>
+            </div>
+            <!-- 탭2: 파일 업로드 -->
+            <div class="bulk-modal__body" id="modalBodyFile" style="display:none;">
+                <div class="bulk-modal__desc">
+                    파일을 업로드하면 <strong>Gemini 3.1 Pro</strong>가 내용을 분석하여<br>
+                    Q&amp;A 지식을 자동 추출하고 학습합니다.
+                </div>
+                <div class="upload-bar__dropzone" id="modalDropzone"
+                    style="border-color:var(--gray-200);color:var(--gray-500);background:var(--gray-50);"
+                    onclick="document.getElementById('modalFileInput').click()">
+                    📥 파일을 드래그하거나 클릭하여 선택하세요<br>
+                    <small style="color:var(--gray-400);">.txt, .pdf, .xlsx, .csv (최대 10MB)</small>
+                    <input type="file" id="modalFileInput" multiple accept=".txt,.pdf,.xlsx,.xls,.csv"
+                        style="display:none;" onchange="handleModalFiles(this.files)">
+                </div>
+                <div id="modalFileList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+                <div class="bulk-modal__result" id="fileUploadResult"></div>
+            </div>
+            <!-- 푸터 -->
+            <div class="bulk-modal__footer">
+                <button class="modal-btn modal-btn--cancel" onclick="closeBulkModal()">닫기</button>
+                <button class="modal-btn modal-btn--submit" id="modalSubmitBtn" onclick="handleModalSubmit()">🧠 대화 분석
+                    &amp; 학습</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 추출 데이터 미리보기 팝업 -->
+    <div class="qa-preview-overlay" id="qaPreviewOverlay">
+        <div class="qa-preview">
+            <div class="qa-preview__header">
+                <h3>📋 추출된 Q&A 데이터 <span id="qaPreviewCount"
+                        style="font-weight:400;color:var(--gray-400);font-size:13px;"></span></h3>
+                <button class="close-btn" onclick="closeQAPreview()">✕</button>
+            </div>
+            <div class="qa-preview__body" id="qaPreviewBody"></div>
         </div>
     </div>
 
     <script>
-        let authToken = '';
+        let authToken = 'auto';
         const learnSessionId = 'learn_' + Math.random().toString(36).substring(2);
+        let lastExtractedItems = [];
 
-        // === 로그인 ===
-        async function doLogin() {
-            const pw = document.getElementById('loginPw').value;
+        // === Q&A 미리보기 팝업 ===
+        function openQAPreview() {
+            const overlay = document.getElementById('qaPreviewOverlay');
+            const body = document.getElementById('qaPreviewBody');
+            const count = document.getElementById('qaPreviewCount');
+            count.textContent = `(${lastExtractedItems.length}건)`;
+
+            if (lastExtractedItems.length === 0) {
+                body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">추출된 데이터가 없습니다.</div>';
+            } else {
+                body.innerHTML = lastExtractedItems.map((item, i) => `
+                    <div class="qa-card">
+                        <div class="qa-card__category">${escapeHtml(item.category || '기타')}</div>
+                        <div class="qa-card__q">Q${i + 1}. ${escapeHtml(item.question)}</div>
+                        <div class="qa-card__a">${escapeHtml(item.answer)}</div>
+                        ${item.keywords && item.keywords.length ? `
+                            <div class="qa-card__keywords">
+                                ${item.keywords.map(k => `<span>${escapeHtml(k)}</span>`).join('')}
+                            </div>` : ''}
+                    </div>
+                `).join('');
+            }
+            overlay.classList.add('show');
+        }
+        function closeQAPreview() {
+            document.getElementById('qaPreviewOverlay').classList.remove('show');
+        }
+        document.getElementById('qaPreviewOverlay').addEventListener('click', function (e) {
+            if (e.target === this) closeQAPreview();
+        });
+
+        // 자동 로그인
+        (async function autoLogin() {
             try {
                 const res = await fetch('/api/admin/login', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: pw })
+                    body: JSON.stringify({ password: 'infam2024' })
                 });
                 const data = await res.json();
-                if (data.success) {
-                    authToken = data.token;
-                    document.getElementById('loginOverlay').style.display = 'none';
+                if (data.success) authToken = data.token;
+            } catch (e) { }
+            loadLearnedData();
+        })();
+
+        // === 학습 지식 패널 토글 ===
+        function toggleKnowledge() {
+            const panel = document.getElementById('knowledgePanel');
+            const btn = document.getElementById('knowledgeToggle');
+            panel.classList.toggle('open');
+            btn.classList.toggle('active');
+        }
+
+        // === 통합 모달 ===
+        let currentModalTab = 'text';
+        let modalFiles = [];
+
+        function openBulkModal(tab) {
+            document.getElementById('bulkOverlay').classList.add('show');
+            switchModalTab(tab || 'text');
+        }
+        function closeBulkModal() {
+            document.getElementById('bulkOverlay').classList.remove('show');
+        }
+        document.getElementById('bulkOverlay').addEventListener('click', function (e) {
+            if (e.target === this) closeBulkModal();
+        });
+
+        function switchModalTab(tab) {
+            currentModalTab = tab;
+            document.getElementById('modalTabText').classList.toggle('active', tab === 'text');
+            document.getElementById('modalTabFile').classList.toggle('active', tab === 'file');
+            document.getElementById('modalBodyText').style.display = tab === 'text' ? '' : 'none';
+            document.getElementById('modalBodyFile').style.display = tab === 'file' ? '' : 'none';
+            const btn = document.getElementById('modalSubmitBtn');
+            btn.textContent = tab === 'text' ? '🧠 대화 분석 & 학습' : '🧠 파일 분석 & 학습';
+        }
+
+        // 파일 탭: 드래그앤드롭
+        const mDropzone = document.getElementById('modalDropzone');
+        mDropzone.addEventListener('dragover', e => { e.preventDefault(); mDropzone.classList.add('dragover'); });
+        mDropzone.addEventListener('dragleave', e => { e.preventDefault(); mDropzone.classList.remove('dragover'); });
+        mDropzone.addEventListener('drop', e => {
+            e.preventDefault();
+            mDropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) handleModalFiles(e.dataTransfer.files);
+        });
+
+        function handleModalFiles(files) {
+            const allowedExts = ['txt', 'pdf', 'xlsx', 'xls', 'csv'];
+            for (const f of files) {
+                const ext = f.name.split('.').pop().toLowerCase();
+                if (!allowedExts.includes(ext) || f.size > 10 * 1024 * 1024) continue;
+                if (!modalFiles.some(x => x.name === f.name)) modalFiles.push(f);
+            }
+            renderModalFiles();
+        }
+        function removeModalFile(idx) {
+            modalFiles.splice(idx, 1);
+            renderModalFiles();
+        }
+        function renderModalFiles() {
+            document.getElementById('modalFileList').innerHTML = modalFiles.map((f, i) =>
+                `<span class="modal-file-tag">📄 ${f.name} <span class="remove" onclick="removeModalFile(${i})">✕</span></span>`
+            ).join('');
+        }
+
+        // 통합 제출
+        function handleModalSubmit() {
+            if (currentModalTab === 'text') {
+                analyzeConversation();
+            } else {
+                uploadModalFiles();
+            }
+        }
+
+        // 파일 업로드 학습
+        async function uploadModalFiles() {
+            if (modalFiles.length === 0) { alert('파일을 선택해주세요.'); return; }
+            const btn = document.getElementById('modalSubmitBtn');
+            const resultEl = document.getElementById('fileUploadResult');
+            btn.disabled = true;
+            btn.textContent = '⏳ AI 분석 중...';
+            resultEl.className = 'bulk-modal__result show';
+            resultEl.innerHTML = '파일을 서버로 전송하고 Gemini 3.1 Pro가 지식을 추출 중입니다... (수십 초 소요)';
+
+            const formData = new FormData();
+            modalFiles.forEach(f => formData.append('documents', f));
+
+            try {
+                const res = await fetch('/api/admin/upload-knowledge', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken },
+                    body: formData
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    lastExtractedItems = data.items || [];
+                    resultEl.innerHTML = `<div class="upload-count">✅ ${data.chunksExtracted}건 Q&A 추출 완료!</div>RAG ${data.ragTotal}개 문서 반영됨
+                        <br><button class="view-data-btn" onclick="openQAPreview()">📋 추출 데이터 확인</button>`;
+                    modalFiles = [];
+                    renderModalFiles();
                     loadLearnedData();
                 } else {
-                    document.getElementById('loginError').style.display = 'block';
+                    resultEl.innerHTML = `❌ 업로드 실패: ${data.error || '알 수 없는 오류'}`;
                 }
-            } catch (e) {
-                document.getElementById('loginError').style.display = 'block';
+            } catch (err) {
+                resultEl.innerHTML = `❌ 네트워크 오류: ${err.message}`;
             }
+            btn.disabled = false;
+            btn.textContent = '🧠 파일 분석 & 학습';
+        }
+
+        // === 제안 칩 사용 ===
+        function useSuggestion(el) {
+            document.getElementById('learnInput').value = el.textContent;
+            document.getElementById('learnInput').focus();
+        }
+
+        // === textarea 자동 높이 ===
+        function autoResizeTextarea(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
         }
 
         // === 채팅 학습 ===
@@ -733,11 +1449,15 @@
             const msg = input.value.trim();
             if (!msg) return;
 
+            // 웰컴 카드 숨기기
+            const welcome = document.getElementById('welcomeCard');
+            if (welcome) welcome.style.display = 'none';
+
             addChatMsg(msg, 'user');
             input.value = '';
+            input.style.height = 'auto';
             document.getElementById('sendBtn').disabled = true;
 
-            // 로딩 표시
             const loadingEl = document.createElement('div');
             loadingEl.className = 'msg bot';
             loadingEl.innerHTML = '🤔 학습 중...';
@@ -792,6 +1512,7 @@
                 const data = await res.json();
                 document.getElementById('totalBadge').textContent = `${data.allTotal}건 학습됨`;
                 document.getElementById('dataStats').textContent = `총 ${data.total}건`;
+                document.getElementById('knowledgeCount').textContent = `(${data.allTotal})`;
                 renderCards(data.data);
             } catch (e) {
                 console.error('데이터 로드 오류:', e);
@@ -801,7 +1522,7 @@
         function renderCards(items) {
             const list = document.getElementById('dataList');
             if (items.length === 0) {
-                list.innerHTML = `<div class="empty-state"><div class="emoji">🧠</div><p>아직 학습된 지식이 없습니다<br>왼쪽에서 AI에게 가르쳐주세요!</p></div>`;
+                list.innerHTML = `<div class="empty-state"><div class="emoji">🧠</div><p>아직 학습된 지식이 없습니다<br>채팅으로 AI에게 가르쳐주세요!</p></div>`;
                 return;
             }
             list.innerHTML = items.map(item => `
@@ -837,15 +1558,6 @@
             return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
-        // === 탭 전환 ===
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
-                btn.classList.toggle('active', (tabId === 'chat' && i === 0) || (tabId === 'upload' && i === 1));
-            });
-            document.getElementById('tabChat').classList.toggle('active', tabId === 'chat');
-            document.getElementById('tabUpload').classList.toggle('active', tabId === 'upload');
-        }
-
         // === 대화 업로드 분석 ===
         async function analyzeConversation() {
             const textarea = document.getElementById('convTextarea');
@@ -855,11 +1567,11 @@
                 return;
             }
 
-            const btn = document.getElementById('uploadBtn');
+            const btn = document.getElementById('modalSubmitBtn');
             const resultEl = document.getElementById('uploadResult');
             btn.disabled = true;
             btn.textContent = '분석 중...';
-            resultEl.className = 'upload-result';
+            resultEl.className = 'bulk-modal__result';
             resultEl.innerHTML = '';
 
             try {
@@ -872,21 +1584,137 @@
 
                 let html = '';
                 if (data.learnedCount > 0) {
+                    lastExtractedItems = data.learnedItems || [];
                     html += `<div class="upload-count">${data.learnedCount}건 학습 완료!</div><br>`;
                     html += data.learnedItems.map(i => `<strong>[${i.category}]</strong> ${escapeHtml(i.question)}`).join('<br>');
-                    html += '<br><br>';
+                    html += `<br><br><button class="view-data-btn" onclick="openQAPreview()">📋 추출 데이터 확인</button><br>`;
                 }
                 html += (data.response || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
 
                 resultEl.innerHTML = html;
-                resultEl.className = 'upload-result show';
+                resultEl.className = 'bulk-modal__result show';
                 loadLearnedData();
             } catch (e) {
                 resultEl.innerHTML = '오류가 발생했습니다. 다시 시도해주세요.';
-                resultEl.className = 'upload-result show';
+                resultEl.className = 'bulk-modal__result show';
             }
             btn.disabled = false;
-            btn.textContent = '대화 분석 & 학습';
+            btn.textContent = '🧠 대화 분석 & 학습';
+        }
+    </script>
+
+    <!-- 파일 업로드 바 JS -->
+    <script>
+        let ubFiles = [];
+        let ubAuthToken = 'auto';
+        let ubDropOpen = false;
+
+        // 자동 로그인
+        (async function () {
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: 'infam2024' })
+                });
+                const data = await res.json();
+                if (data.success) ubAuthToken = data.token;
+            } catch (e) { }
+        })();
+
+        function toggleUploadDrop() {
+            ubDropOpen = !ubDropOpen;
+            document.getElementById('ubDrop').classList.toggle('open', ubDropOpen);
+        }
+
+        // 드래그 앤 드롭
+        const ubDropzone = document.getElementById('ubDropzone');
+        ubDropzone.addEventListener('dragover', e => { e.preventDefault(); ubDropzone.classList.add('dragover'); });
+        ubDropzone.addEventListener('dragleave', e => { e.preventDefault(); ubDropzone.classList.remove('dragover'); });
+        ubDropzone.addEventListener('drop', e => {
+            e.preventDefault();
+            ubDropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) handleUploadFiles(e.dataTransfer.files);
+        });
+
+        function handleUploadFiles(files) {
+            const allowedExts = ['txt', 'pdf', 'xlsx', 'xls', 'csv'];
+            for (const f of files) {
+                const ext = f.name.split('.').pop().toLowerCase();
+                if (!allowedExts.includes(ext)) continue;
+                if (f.size > 10 * 1024 * 1024) continue;
+                if (!ubFiles.some(x => x.name === f.name)) ubFiles.push(f);
+            }
+            renderUbFiles();
+        }
+
+        function removeUbFile(idx) {
+            ubFiles.splice(idx, 1);
+            renderUbFiles();
+        }
+
+        function renderUbFiles() {
+            const list = document.getElementById('ubFileList');
+            const countEl = document.getElementById('ubFileCount');
+            const submitBtn = document.getElementById('ubSubmitBtn');
+
+            if (ubFiles.length === 0) {
+                list.innerHTML = '';
+                countEl.classList.remove('show');
+                submitBtn.classList.remove('show');
+                return;
+            }
+
+            countEl.textContent = ubFiles.length + '개';
+            countEl.classList.add('show');
+            submitBtn.classList.add('show');
+
+            if (!ubDropOpen) toggleUploadDrop();
+
+            list.innerHTML = ubFiles.map((f, i) =>
+                `<span class="upload-file-tag">📄 ${f.name} <span class="remove" onclick="removeUbFile(${i})">✕</span></span>`
+            ).join('');
+        }
+
+        async function uploadFilesLearn() {
+            if (ubFiles.length === 0) return;
+
+            const btn = document.getElementById('ubSubmitBtn');
+            const statusEl = document.getElementById('ubStatus');
+            btn.disabled = true;
+            btn.textContent = '⏳ 학습 중...';
+            statusEl.textContent = '파일을 서버로 전송하고 AI가 지식을 추출 중입니다... (수십 초 소요)';
+            statusEl.classList.add('show');
+
+            const formData = new FormData();
+            ubFiles.forEach(f => formData.append('documents', f));
+
+            try {
+                const res = await fetch('/api/admin/upload-knowledge', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${ubAuthToken}` },
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    statusEl.textContent = `✅ ${data.chunksExtracted}개 Q&A 추출 완료! RAG ${data.ragTotal}개 문서 반영됨`;
+                    ubFiles = [];
+                    renderUbFiles();
+
+                    if (typeof loadLearnedData === 'function') loadLearnedData();
+
+                    setTimeout(() => {
+                        statusEl.classList.remove('show');
+                    }, 5000);
+                } else {
+                    statusEl.textContent = `❌ 업로드 실패: ${data.error || '알 수 없는 오류'}`;
+                }
+            } catch (err) {
+                statusEl.textContent = `❌ 네트워크 오류: ${err.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🧠 선택한 파일 저장 및 학습하기';
+            }
         }
     </script>
 </body>
