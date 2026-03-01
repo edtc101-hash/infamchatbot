@@ -1,166 +1,219 @@
 /**
- * 로컬 TF-IDF 기반 임베딩 생성기
- * 외부 API 없이 로컬에서 텍스트 벡터화
- * 한국어 + 영어 지원, n-gram 기반
+ * Gemini Embedding API 기반 임베딩 생성기
+ * text-embedding-004 → gemini-embedding-001 (3072차원, 100+ 언어 지원)
+ * 의미 기반 벡터 검색을 위한 실제 신경망 임베딩
  */
 
-// 글로벌 어휘 사전 (문서 전체에서 구축)
-let vocabulary = new Map(); // word -> index
-let idfValues = new Map();  // word -> IDF value
-let vocabBuilt = false;
+const fs = require('fs');
+const path = require('path');
 
-/**
- * 한국어/영어 텍스트 토큰화
- */
-function tokenize(text) {
-    const normalized = text.toLowerCase()
-        .replace(/[^\uAC00-\uD7A3a-zA-Z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+const CACHE_FILE = path.join(__dirname, '..', 'rag-data', 'embedding-cache.json');
 
-    const words = normalized.split(' ').filter(w => w.length >= 2);
+// 임베딩 캐시 (API 호출 절약)
+let embeddingCache = new Map();
+let cacheLoaded = false;
 
-    // 2-gram 추가 (의미 포착 강화)
-    const bigrams = [];
-    for (let i = 0; i < words.length - 1; i++) {
-        bigrams.push(words[i] + '_' + words[i + 1]);
+/** 캐시 로드 */
+function loadCache() {
+    if (cacheLoaded) return;
+    try {
+        if (fs.existsSync(CACHE_FILE)) {
+            const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
+            embeddingCache = new Map(Object.entries(data));
+            console.log(`📦 임베딩 캐시 로드: ${embeddingCache.size}개`);
+        }
+    } catch (e) {
+        console.warn('임베딩 캐시 로드 실패:', e.message);
     }
+    cacheLoaded = true;
+}
 
-    return [...words, ...bigrams];
+/** 캐시 저장 */
+function saveCache() {
+    try {
+        const dir = path.dirname(CACHE_FILE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const obj = Object.fromEntries(embeddingCache);
+        fs.writeFileSync(CACHE_FILE, JSON.stringify(obj), 'utf-8');
+    } catch (e) {
+        console.warn('임베딩 캐시 저장 실패:', e.message);
+    }
+}
+
+/** 캐시 키 생성 (텍스트 해시) */
+function cacheKey(text) {
+    // 간단한 해시 — 동일 텍스트 재임베딩 방지
+    let hash = 0;
+    const str = text.trim().toLowerCase();
+    for (let i = 0; i < str.length; i++) {
+        const chr = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + chr;
+        hash |= 0;
+    }
+    return `emb_${hash}_${str.length}`;
 }
 
 /**
- * 문서 집합에서 어휘 사전 및 IDF 구축
- * @param {string[]} documents - 전체 문서 배열
- */
-function buildVocabulary(documents) {
-    const docFreq = new Map(); // word -> 등장 문서 수
-    const allTokens = new Set();
-
-    // 문서별 단어 빈도 계산
-    for (const doc of documents) {
-        const tokens = new Set(tokenize(doc));
-        for (const token of tokens) {
-            allTokens.add(token);
-            docFreq.set(token, (docFreq.get(token) || 0) + 1);
-        }
-    }
-
-    // 빈도 기반 필터링: 너무 흔하거나 너무 드문 단어 제외
-    const N = documents.length;
-    const filteredTokens = [];
-    for (const token of allTokens) {
-        const df = docFreq.get(token) || 0;
-        // 전체 문서의 80% 이상에 나타나면 제외 (불용어), 1회만 나타나면 유지 (고유 용어)
-        if (df / N <= 0.8) {
-            filteredTokens.push(token);
-        }
-    }
-
-    // 빈도순 정렬 후 상위 N개 선택 (벡터 차원 제한)
-    const MAX_DIM = 512;
-    filteredTokens.sort((a, b) => (docFreq.get(b) || 0) - (docFreq.get(a) || 0));
-    const selectedTokens = filteredTokens.slice(0, MAX_DIM);
-
-    // 어휘 사전 구축
-    vocabulary = new Map();
-    idfValues = new Map();
-    selectedTokens.forEach((token, idx) => {
-        vocabulary.set(token, idx);
-        const df = docFreq.get(token) || 1;
-        idfValues.set(token, Math.log(N / df) + 1);
-    });
-
-    vocabBuilt = true;
-    console.log(`📚 TF-IDF 어휘 사전 구축: ${vocabulary.size}개 단어, ${N}개 문서 기반`);
-}
-
-/**
- * TF-IDF 벡터 생성
+ * Gemini Embedding API로 단일 텍스트 임베딩 생성
  * @param {string} text - 입력 텍스트
- * @returns {number[]} TF-IDF 벡터
- */
-function generateEmbeddingSync(text) {
-    if (!vocabBuilt || vocabulary.size === 0) {
-        return [];
-    }
-
-    const tokens = tokenize(text);
-    const tf = new Map();
-
-    // Term Frequency 계산
-    for (const token of tokens) {
-        tf.set(token, (tf.get(token) || 0) + 1);
-    }
-
-    // TF-IDF 벡터 생성
-    const vector = new Array(vocabulary.size).fill(0);
-    for (const [token, freq] of tf) {
-        const idx = vocabulary.get(token);
-        if (idx !== undefined) {
-            const tfVal = 1 + Math.log(freq); // 로그 스케일 TF
-            const idfVal = idfValues.get(token) || 1;
-            vector[idx] = tfVal * idfVal;
-        }
-    }
-
-    // L2 정규화
-    let norm = 0;
-    for (const val of vector) norm += val * val;
-    norm = Math.sqrt(norm);
-    if (norm > 0) {
-        for (let i = 0; i < vector.length; i++) {
-            vector[i] /= norm;
-        }
-    }
-
-    return vector;
-}
-
-/**
- * 임베딩 생성 (비동기 인터페이스 유지, 내부는 동기)
- * @param {string} text
- * @param {string} apiKey - 미사용 (호환성 유지)
- * @returns {Promise<number[]>}
+ * @param {string} apiKey - Gemini API 키
+ * @returns {Promise<number[]>} 768차원 임베딩 벡터
  */
 async function generateEmbedding(text, apiKey) {
-    return generateEmbeddingSync(text);
+    loadCache();
+    const key = cacheKey(text);
+    if (embeddingCache.has(key)) {
+        return embeddingCache.get(key);
+    }
+
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'models/gemini-embedding-001',
+                    content: { parts: [{ text }] },
+                    outputDimensionality: 768  // MRL: 768차원으로 축소 (성능 최적화)
+                })
+            }
+        );
+
+        if (!response.ok) {
+            const errBody = await response.text();
+            throw new Error(`Embedding API ${response.status}: ${errBody.substring(0, 200)}`);
+        }
+
+        const data = await response.json();
+        const embedding = data.embedding?.values;
+        if (!embedding || embedding.length === 0) {
+            throw new Error('빈 임베딩 반환됨');
+        }
+
+        embeddingCache.set(key, embedding);
+        return embedding;
+    } catch (err) {
+        console.error(`임베딩 생성 실패: ${err.message}`);
+        return [];
+    }
 }
 
 /**
- * 배치 임베딩 생성
- * 어휘 사전이 없으면 먼저 구축
+ * 배치 임베딩 생성 (레이트 리밋 핸들링 포함)
+ * @param {string[]} texts - 입력 텍스트 배열
+ * @param {string} apiKey - Gemini API 키
+ * @param {Function} onProgress - 진행 콜백
+ * @returns {Promise<number[][]>} 임베딩 벡터 배열
  */
 async function generateEmbeddingsBatch(texts, apiKey, onProgress) {
-    // 어휘 사전 구축 (최초 1회)
-    if (!vocabBuilt) {
-        buildVocabulary(texts);
-    }
+    loadCache();
 
     const results = [];
-    for (let i = 0; i < texts.length; i++) {
-        const embedding = generateEmbeddingSync(texts[i]);
-        results.push(embedding);
-        if (onProgress && (i % 20 === 0 || i === texts.length - 1)) {
-            onProgress(i + 1, texts.length);
+    let apiCalls = 0;
+    let cacheHits = 0;
+    const BATCH_SIZE = 5;      // 동시 요청 수
+    const DELAY_MS = 200;      // 배치 간 딜레이
+
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+        const batch = texts.slice(i, i + BATCH_SIZE);
+        const batchPromises = batch.map(async (text) => {
+            const key = cacheKey(text);
+            if (embeddingCache.has(key)) {
+                cacheHits++;
+                return embeddingCache.get(key);
+            }
+
+            try {
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'models/gemini-embedding-001',
+                            content: { parts: [{ text }] },
+                            outputDimensionality: 768
+                        })
+                    }
+                );
+
+                if (response.status === 429) {
+                    // 레이트 리밋 — 잠시 대기 후 재시도
+                    await new Promise(r => setTimeout(r, 3000));
+                    const retryResp = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                model: 'models/gemini-embedding-001',
+                                content: { parts: [{ text }] },
+                                outputDimensionality: 768
+                            })
+                        }
+                    );
+                    if (!retryResp.ok) return [];
+                    const retryData = await retryResp.json();
+                    const emb = retryData.embedding?.values || [];
+                    if (emb.length > 0) embeddingCache.set(key, emb);
+                    apiCalls++;
+                    return emb;
+                }
+
+                if (!response.ok) {
+                    console.warn(`임베딩 실패 (${response.status}): ${text.substring(0, 40)}...`);
+                    return [];
+                }
+
+                const data = await response.json();
+                const emb = data.embedding?.values || [];
+                if (emb.length > 0) {
+                    embeddingCache.set(key, emb);
+                    apiCalls++;
+                }
+                return emb;
+            } catch (err) {
+                console.warn(`임베딩 오류: ${err.message}`);
+                return [];
+            }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+
+        if (onProgress) {
+            onProgress(Math.min(i + BATCH_SIZE, texts.length), texts.length);
+        }
+
+        // 레이트 리밋 방지 딜레이
+        if (i + BATCH_SIZE < texts.length && apiCalls > 0) {
+            await new Promise(r => setTimeout(r, DELAY_MS));
         }
     }
+
+    // 캐시 저장
+    saveCache();
+    console.log(`🧠 임베딩 완료: API ${apiCalls}회 호출, 캐시 ${cacheHits}회 히트`);
+
     return results;
 }
 
-/** 캐시 통계 (호환성) */
+/** 캐시 통계 */
 function getCacheStats() {
     return {
-        vocabularySize: vocabulary.size,
-        vocabBuilt,
+        cacheSize: embeddingCache.size,
+        cacheLoaded,
     };
 }
 
-/** 어휘 사전 리셋 */
+/** 캐시 초기화 */
 function clearCache() {
-    vocabulary = new Map();
-    idfValues = new Map();
-    vocabBuilt = false;
+    embeddingCache = new Map();
+    cacheLoaded = false;
+    try {
+        if (fs.existsSync(CACHE_FILE)) fs.unlinkSync(CACHE_FILE);
+    } catch (e) { }
 }
 
 module.exports = {
@@ -168,5 +221,4 @@ module.exports = {
     generateEmbeddingsBatch,
     getCacheStats,
     clearCache,
-    buildVocabulary,
 };

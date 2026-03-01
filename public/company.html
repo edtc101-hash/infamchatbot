@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회사소개 | 인팸 InteriorFamily</title>
+    <meta name="description" content="인팸(InteriorFamily) 회사소개 - EDTC 인재상, 업무관, 기업 비전">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: auto;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto !important;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: #f0f4f0;
+            color: #1e293b;
+        }
+
+        /* 상단 헤더 */
+        .top-bar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .top-bar-left img {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+        }
+
+        .top-bar-left h1 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2d5a3d;
+        }
+
+        .top-bar-left h1 small {
+            font-size: 12px;
+            font-weight: 400;
+            color: #94a3b8;
+            margin-left: 6px;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 18px;
+            background: #2d5a3d;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #1e4a2e;
+        }
+
+        /* 섹션 네비게이션 */
+        .section-nav {
+            position: sticky;
+            top: 61px;
+            z-index: 40;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e2e8f0;
+            padding: 10px 24px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+        }
+
+        .nav-pill {
+            padding: 8px 18px;
+            border-radius: 20px;
+            border: 1.5px solid #d1d5db;
+            background: white;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: all 0.25s;
+            font-family: inherit;
+            color: #475569;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-pill:hover {
+            border-color: #3a7d44;
+            color: #3a7d44;
+            background: #f0fdf4;
+        }
+
+        .nav-pill.active {
+            background: #2d5a3d;
+            color: white;
+            border-color: #2d5a3d;
+        }
+
+        /* 편집 도구바 */
+        .edit-bar {
+            position: sticky;
+            top: 109px;
+            z-index: 30;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px 24px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .edit-bar .bar-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #3a7d44;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        .bar-divider {
+            width: 1px;
+            height: 22px;
+            background: #e2e8f0;
+            margin: 0 6px;
+            flex-shrink: 0;
+        }
+
+        .edit-bar button {
+            width: 34px;
+            height: 34px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #475569;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: inherit;
+        }
+
+        .edit-bar button:hover {
+            background: #f0fdf4;
+            border-color: #3a7d44;
+            color: #3a7d44;
+        }
+
+        .edit-bar button.wide {
+            width: auto;
+            padding: 0 12px;
+            font-size: 12px;
+            gap: 4px;
+        }
+
+        .save-btn {
+            background: #2d5a3d !important;
+            color: white !important;
+            border-color: #2d5a3d !important;
+            margin-left: auto;
+        }
+
+        .save-btn:hover {
+            background: #1e4a2e !important;
+        }
+
+        .save-status {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-left: 8px;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .save-status.saved {
+            color: #16a34a;
+        }
+
+        /* 메인 컨텐츠 */
+        .page-wrap {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 28px 20px 80px;
+        }
+
+        .content-area {
+            background: white;
+            border-radius: 14px;
+            padding: 36px 40px;
+            box-shadow: 0 1px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            min-height: 500px;
+            outline: none;
+            line-height: 1.85;
+            font-size: 15px;
+            color: #334155;
+        }
+
+        .content-area:focus {
+            border-color: rgba(58, 125, 68, 0.25);
+            box-shadow: 0 1px 12px rgba(58, 125, 68, 0.06);
+        }
+
+        .content-area h2 {
+            font-size: 21px;
+            font-weight: 700;
+            color: #1e4a2e;
+            margin: 32px 0 14px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #dcfce7;
+            scroll-margin-top: 170px;
+        }
+
+        .content-area h2:first-child {
+            margin-top: 0;
+        }
+
+        .content-area h3 {
+            font-size: 17px;
+            font-weight: 600;
+            color: #3a7d44;
+            margin: 22px 0 8px;
+        }
+
+        .content-area p {
+            margin: 6px 0;
+        }
+
+        .content-area ul,
+        .content-area ol {
+            padding-left: 22px;
+            margin: 8px 0;
+        }
+
+        .content-area li {
+            margin: 5px 0;
+        }
+
+        .content-area strong {
+            color: #1e4a2e;
+            font-weight: 600;
+        }
+
+        .content-area .highlight-box {
+            background: linear-gradient(135deg, rgba(58, 125, 68, 0.04), rgba(58, 125, 68, 0.08));
+            border-left: 4px solid #3a7d44;
+            padding: 16px 20px;
+            border-radius: 0 10px 10px 0;
+            margin: 16px 0;
+        }
+
+        .content-area .vision-box {
+            background: linear-gradient(135deg, #1e4a2e, #3a7d44);
+            color: white;
+            padding: 28px;
+            border-radius: 14px;
+            text-align: center;
+            margin: 24px 0;
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .notion-source {
+            margin-top: 24px;
+            padding: 12px 18px;
+            background: rgba(0, 0, 0, 0.025);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .notion-source a {
+            color: #3a7d44;
+            text-decoration: none;
+        }
+
+        .notion-source a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .page-wrap {
+                padding: 16px 12px 60px;
+            }
+
+            .content-area {
+                padding: 20px 18px;
+            }
+
+            .top-bar {
+                padding: 10px 14px;
+            }
+
+            .section-nav {
+                padding: 8px 14px;
+            }
+
+            .edit-bar {
+                padding: 6px 14px;
+                flex-wrap: wrap;
+            }
+
+            .top-bar-left h1 small {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 상단 헤더 -->
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <img src="infam-logo.svg" alt="인팸">
+            <h1>회사소개 <small>Company Profile</small></h1>
+        </div>
+        <a href="/" class="back-btn">← 챗봇</a>
+    </div>
+
+    <!-- 섹션 네비게이션 -->
+    <div class="section-nav" id="sectionNav">
+        <a href="#sec-welcome" class="nav-pill active" onclick="scrollToSection(event, 'sec-welcome')">👋 환영합니다</a>
+        <a href="#sec-edtc" class="nav-pill" onclick="scrollToSection(event, 'sec-edtc')">🧑‍💼 인재상</a>
+        <a href="#sec-work" class="nav-pill" onclick="scrollToSection(event, 'sec-work')">📖 업무관</a>
+        <a href="#sec-tenets" class="nav-pill" onclick="scrollToSection(event, 'sec-tenets')">📜 TENETS</a>
+        <a href="#sec-vision" class="nav-pill" onclick="scrollToSection(event, 'sec-vision')">🚀 비전</a>
+    </div>
+
+    <!-- 편집 도구바 -->
+    <div class="edit-bar">
+        <span class="bar-label">✏️ 편집</span>
+        <button onclick="execCmd('bold')" title="굵게 (Ctrl+B)"><b>B</b></button>
+        <button onclick="execCmd('italic')" title="기울임 (Ctrl+I)"><i>I</i></button>
+        <button onclick="execCmd('underline')" title="밑줄 (Ctrl+U)"><u>U</u></button>
+        <div class="bar-divider"></div>
+        <button class="wide" onclick="execCmd('insertUnorderedList')" title="글머리 기호">• 목록</button>
+        <button class="wide" onclick="execCmd('insertOrderedList')" title="번호 목록">1. 번호</button>
+        <div class="bar-divider"></div>
+        <button class="wide" onclick="formatBlock('h2')" title="대제목">H2</button>
+        <button class="wide" onclick="formatBlock('h3')" title="소제목">H3</button>
+        <button class="wide" onclick="formatBlock('p')" title="본문">P</button>
+        <button class="save-btn wide" onclick="saveContent()">💾 저장</button>
+        <span class="save-status" id="saveStatus">💡 편집 → 저장</span>
+    </div>
+
+    <!-- 컨텐츠 -->
+    <div class="page-wrap">
+        <div class="content-area" id="companyContent" contenteditable="true">
+
+            <h2 id="sec-welcome">👋 환영합니다</h2>
+            <p>인팸(InteriorFamily)은 인테리어 자재 유통 및 미디어커머스 분야의 혁신 기업입니다.</p>
+
+            <div class="highlight-box">
+                <strong>📂 업무 자료:</strong> <a
+                    href="https://drive.google.com/drive/u/1/folders/17RSm0peE8KvP6bVuU-lT0J2vQ_l9IcJc"
+                    target="_blank">Google Drive 바로가기</a> (권한 필요)<br>
+                <strong>📋 기본 원칙:</strong> <a href="https://edtc.notion.site/4-fafb06c5f9fb4f4a98a718a8631c984b?pvs=25"
+                    target="_blank">인팸 업무보고 4원칙 실천</a>
+            </div>
+
+            <h2 id="sec-edtc">🧑‍💼 인팸이 바라는 인재상 (EDTC Model)</h2>
+            <ul>
+                <li><strong>E (Energetic):</strong> 긍정적인 에너지로 주변에 활력을 주고, 열정적으로 업무에 임하는 인재</li>
+                <li><strong>D (Detail):</strong> 작은 차이가 큰 결과를 만든다는 믿음으로 꼼꼼하게 업무를 챙기는 인재</li>
+                <li><strong>T (Trust / Together):</strong> 동료와 신뢰를 쌓고 함께 성장하며 공동의 목표를 향해 나아가는 인재</li>
+                <li><strong>C (Communication / Curiosity):</strong> 끊임없이 질문하고 원활하게 소통하며 문제를 해결하려는 인재</li>
+            </ul>
+
+            <h2 id="sec-work">📖 인팸의 7가지 업무관</h2>
+            <ol>
+                <li><strong>완벽함보다는 완료가 낫다:</strong> 완벽을 기하느라 시기를 놓치기보다, 우선 실행하고 개선한다.</li>
+                <li><strong>속도는 생명이다:</strong> 빠른 실행과 기민한 대응을 최우선으로 한다.</li>
+                <li><strong>오너십:</strong> 모든 일에 주인의식을 가지고 스스로 판단하고 책임진다.</li>
+                <li><strong>프로페셔널리즘:</strong> 각자의 분야에서 최고의 전문성을 발휘한다.</li>
+                <li><strong>팀워크:</strong> 개인의 성과보다 팀의 시너지를 우선시하며 협력한다.</li>
+                <li><strong>역지사지 사고방식:</strong> "내가 고객이라면?"이라는 질문을 던지며 고객의 입장에서 대안을 제시한다.</li>
+                <li><strong>학습이 곧 경험이다:</strong> 경험하지 못한 것도 학습을 통해 내재화하여 전문적인 상담과 업무를 수행한다.</li>
+            </ol>
+
+            <h2 id="sec-tenets">📜 인팸 TENETS (6계명)</h2>
+            <ol>
+                <li>불신뢰의 시그널들을 지속적으로 제거한다.</li>
+                <li>정보는 독점하지 않는다. 모두가 투명하게 정보를 공유한다.</li>
+                <li>상호신뢰를 강화하는 커뮤니케이션 인프라 구축은 지상과제이다.</li>
+                <li>모두가 참여감을 가질 수 있는 조직구조로 성장시킨다.</li>
+                <li>조직원 간의 기대관리를 통해 서로 실망시키지 않도록 노력한다.</li>
+                <li>회사는 팀원의 삶에서 가장 즐겁고 쾌적한 공간이어야 한다.</li>
+            </ol>
+
+            <h2 id="sec-vision">🚀 기업 비전</h2>
+            <div class="vision-box">
+                유통의 혁신! 미디어커머스 혁신! 수출플랫폼 혁신!
+            </div>
+
+        </div>
+
+        <div class="notion-source">
+            <span>📌</span>
+            원본: <a href="https://www.notion.so/edtc/cd840624491e42789550e8308b28c0e5" target="_blank">Notion 페이지</a>
+            &nbsp;|&nbsp; 편집 후 💾 저장 또는 Ctrl+S
+        </div>
+    </div>
+
+    <script>
+        function execCmd(command) {
+            document.execCommand(command, false, null);
+            document.getElementById('companyContent').focus();
+        }
+
+        function formatBlock(tag) {
+            document.execCommand('formatBlock', false, '<' + tag + '>');
+            document.getElementById('companyContent').focus();
+        }
+
+        // 섹션 스크롤
+        function scrollToSection(e, id) {
+            e.preventDefault();
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // 네비 활성화
+                document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+            }
+        }
+
+        // 스크롤 감지 → 네비 활성화
+        const sectionIds = ['sec-welcome', 'sec-edtc', 'sec-work', 'sec-tenets', 'sec-vision'];
+        window.addEventListener('scroll', () => {
+            let current = sectionIds[0];
+            for (const id of sectionIds) {
+                const el = document.getElementById(id);
+                if (el && el.getBoundingClientRect().top <= 180) {
+                    current = id;
+                }
+            }
+            document.querySelectorAll('.nav-pill').forEach(p => {
+                p.classList.toggle('active', p.getAttribute('href') === '#' + current);
+            });
+        });
+
+        // 저장
+        function saveContent() {
+            const content = document.getElementById('companyContent').innerHTML;
+            const statusEl = document.getElementById('saveStatus');
+
+            localStorage.setItem('company-intro-content', content);
+            localStorage.setItem('company-intro-updated', new Date().toISOString());
+
+            fetch('/api/company-content', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            }).then(res => {
+                if (res.ok) {
+                    statusEl.innerHTML = '✅ 저장됨 (' + new Date().toLocaleTimeString() + ')';
+                    statusEl.className = 'save-status saved';
+                } else {
+                    statusEl.innerHTML = '⚠️ 로컬만 저장';
+                    statusEl.className = 'save-status saved';
+                }
+            }).catch(() => {
+                statusEl.innerHTML = '⚠️ 로컬만 저장';
+                statusEl.className = 'save-status saved';
+            });
+        }
+
+        // 불러오기
+        function loadContent() {
+            fetch('/api/company-content')
+                .then(res => res.ok ? res.json() : Promise.reject())
+                .then(data => {
+                    if (data && data.content) {
+                        document.getElementById('companyContent').innerHTML = data.content;
+                        document.getElementById('saveStatus').innerHTML = '📄 서버에서 불러옴';
+                        document.getElementById('saveStatus').className = 'save-status saved';
+                    }
+                })
+                .catch(() => {
+                    const saved = localStorage.getItem('company-intro-content');
+                    if (saved) {
+                        document.getElementById('companyContent').innerHTML = saved;
+                        document.getElementById('saveStatus').innerHTML = '📄 로컬에서 불러옴';
+                        document.getElementById('saveStatus').className = 'save-status saved';
+                    }
+                });
+        }
+
+        // 자동 저장 30초
+        setInterval(() => {
+            const content = document.getElementById('companyContent').innerHTML;
+            localStorage.setItem('company-intro-content', content);
+            localStorage.setItem('company-intro-updated', new Date().toISOString());
+        }, 30000);
+
+        // Ctrl+S
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveContent();
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', loadContent);
+    </script>
+</body>
+
+</html>

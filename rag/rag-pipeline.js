@@ -8,6 +8,10 @@ const fs = require('fs');
 const path = require('path');
 const { addDocumentsBatch, searchByEmbedding, getStats, clearVectors } = require('./vector-store');
 const { generateEmbedding, generateEmbeddingsBatch } = require('./embeddings');
+let pdfParse;
+try { pdfParse = require('pdf-parse'); } catch (e) { console.warn('pdf-parse 미설치'); }
+let xlsx;
+try { xlsx = require('xlsx'); } catch (e) { console.warn('xlsx 미설치'); }
 
 const FAQ_FILE = path.join(__dirname, '..', 'faq-data.json');
 const PRODUCT_FILE = path.join(__dirname, '..', 'product-data.json');
@@ -105,7 +109,105 @@ function prepareLearnedDocuments() {
 }
 
 /**
- * 전체 벡터 스토어 빌드 (FAQ + 제품 + 학습 데이터)
+ * 카탈로그 PDF 데이터를 벡터 문서로 변환
+ * catalogs/ 폴더의 PDF에서 텍스트 추출 → 청킹
+ */
+async function prepareCatalogDocuments() {
+    const catalogDir = path.join(__dirname, '..', 'catalogs');
+    if (!fs.existsSync(catalogDir)) return [];
+
+    const docs = [];
+    const pdfFiles = fs.readdirSync(catalogDir).filter(f => f.endsWith('.pdf'));
+
+    for (const file of pdfFiles) {
+        try {
+            if (typeof pdfParse !== 'function') continue;
+            const dataBuffer = fs.readFileSync(path.join(catalogDir, file));
+            const pdfData = await pdfParse(dataBuffer);
+            const text = (pdfData && pdfData.text) ? pdfData.text.trim() : '';
+
+            if (!text || text.length < 50) continue;
+
+            const productName = file.replace('.pdf', '').trim();
+
+            // 텍스트를 800자 청크로 분할 (200자 오버랩)
+            const CHUNK_SIZE = 800;
+            const OVERLAP = 200;
+            const chunks = [];
+
+            for (let i = 0; i < text.length; i += CHUNK_SIZE - OVERLAP) {
+                const chunk = text.substring(i, i + CHUNK_SIZE).trim();
+                if (chunk.length > 50) chunks.push(chunk);
+            }
+
+            // 최대 5개 청크만 (비용 절감)
+            const selectedChunks = chunks.slice(0, 5);
+            selectedChunks.forEach((chunk, idx) => {
+                docs.push({
+                    id: `catalog_${productName}_${idx}`,
+                    title: `${productName} 카탈로그 (${idx + 1}/${selectedChunks.length})`,
+                    content: `[제품 카탈로그: ${productName}] ${chunk}`,
+                    category: '카탈로그',
+                });
+            });
+        } catch (err) {
+            console.warn(`📄 카탈로그 파싱 실패: ${file} — ${err.message}`);
+        }
+    }
+    return docs;
+}
+
+/**
+ * Excel 데이터를 벡터 문서로 변환
+ * data/ 폴더의 xlsx 파일 파싱
+ */
+function prepareExcelDocuments() {
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) return [];
+
+    const docs = [];
+    const xlsxFiles = fs.readdirSync(dataDir).filter(f => f.endsWith('.xlsx'));
+
+    for (const file of xlsxFiles) {
+        try {
+            if (!xlsx) continue;
+            const wb = xlsx.readFile(path.join(dataDir, file));
+
+            for (const sheetName of wb.SheetNames) {
+                const ws = wb.Sheets[sheetName];
+                const rows = xlsx.utils.sheet_to_json(ws, { defval: '' });
+
+                if (rows.length === 0) continue;
+
+                // 20행씩 그룹핑하여 문서화
+                for (let i = 0; i < rows.length; i += 20) {
+                    const group = rows.slice(i, i + 20);
+                    const content = group.map(row =>
+                        Object.entries(row)
+                            .filter(([, v]) => v !== '' && v !== null && v !== undefined)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(' | ')
+                    ).join('\n');
+
+                    if (content.length > 50) {
+                        docs.push({
+                            id: `excel_${file}_${sheetName}_${i}`,
+                            title: `${file} - ${sheetName} (행 ${i + 1}~${Math.min(i + 20, rows.length)})`,
+                            content: `[데이터: ${file} / ${sheetName}]\n${content}`,
+                            category: '데이터',
+                        });
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn(`📊 Excel 파싱 실패: ${file} — ${err.message}`);
+        }
+    }
+    return docs;
+}
+
+/**
+ * 전체 벡터 스토어 빌드 (FAQ + 제품 + 학습 + 카탈로그 + Excel)
  * 서버 시작 시 또는 수동으로 호출
  */
 async function buildVectorStore() {
@@ -127,9 +229,11 @@ async function buildVectorStore() {
         const faqDocs = prepareFAQDocuments();
         const productDocs = prepareProductDocuments();
         const learnedDocs = prepareLearnedDocuments();
-        const allDocs = [...faqDocs, ...productDocs, ...learnedDocs];
+        const catalogDocs = await prepareCatalogDocuments();
+        const excelDocs = prepareExcelDocuments();
+        const allDocs = [...faqDocs, ...productDocs, ...learnedDocs, ...catalogDocs, ...excelDocs];
 
-        console.log(`📄 문서 준비 완료: FAQ ${faqDocs.length}개, 제품 ${productDocs.length}개, 학습 ${learnedDocs.length}개 (총 ${allDocs.length}개)`);
+        console.log(`📄 문서 준비 완료: FAQ ${faqDocs.length}개, 제품 ${productDocs.length}개, 학습 ${learnedDocs.length}개, 카탈로그 ${catalogDocs.length}개, Excel ${excelDocs.length}개 (총 ${allDocs.length}개)`);
 
         if (allDocs.length === 0) {
             console.log('⚠️ 인덱싱할 문서가 없습니다.');

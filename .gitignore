@@ -2,6 +2,11 @@ node_modules/
 .env
 .DS_Store
 *.log
+.agent/
+.vscode/
+.claude/
+uploads/
+data/카톡대화/
 # Do NOT ignore data files initially (faq-data.json, learned-data.json, product-data.json, knowledge-base.js) 
 # because they are needed as seed data for the production server.
 # Also do not ignore public/ or vector-store.json (though vector-store gets rebuilt, it's fine to commit the first one).

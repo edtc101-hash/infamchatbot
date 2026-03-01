@@ -2,8 +2,19 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
+const xlsx = require('xlsx');
+const pdf = require('pdf-parse');
+const cheerio = require('cheerio');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
 const { BRAND_KNOWLEDGE } = require('./knowledge-base');
+
+// .env 파일 로드 (로컬 개발용)
+try { require('dotenv').config(); } catch { /* dotenv 미설치 시 무시 */ }
+
+// 업로드 설정
+const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 const { setApiKey, buildVectorStore, ragSearch, getRAGStatus } = require('./rag/rag-pipeline');
 
 const app = express();
@@ -12,16 +23,31 @@ const FAQ_FILE = path.join(__dirname, 'faq-data.json');
 const LEARNED_FILE = path.join(__dirname, 'learned-data.json');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'infam2024';
 
-// Gemini AI 초기화 (gemini-2.5-flash 모델 사용)
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyD3wIhlwphHjTjZA9BNUjnO7RmPOgRfmLg';
+// Gemini AI 초기화 — 최신 모델 (2026.02 changelog)
+// 추론/분석: gemini-3.1-pro-preview (최고 성능 추론 + 멀티모달 이해)
+// 이미지 생성: gemini-3.1-flash-image-preview (Nano Banana 2) / gemini-3-pro-image-preview
+// 시각 분석: gemini-3-flash-preview (시각적·공간적 추론 강화)
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+    console.error('❌ GEMINI_API_KEY 환경변수가 설정되지 않았습니다!');
+    console.error('   로컬: .env 파일에 GEMINI_API_KEY=... 추가');
+    console.error('   Render: Dashboard → Environment Variables에서 설정');
+    process.exit(1);
+}
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' }); // 채팅용 (최신 추론 모델)
+const visionModel = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' }); // 시각 분석용
+
+// Nano Banana 2 (Gemini 3.1 Flash Image — 최신 이미지 생성)
+const genAINB = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const IMAGE_GEN_MODEL = 'gemini-3.1-flash-image-preview'; // Nano Banana 2
+const IMAGE_GEN_FALLBACK = 'gemini-3-pro-image-preview'; // Nano Banana 1 (fallback)
 
 // RAG 파이프라인에 API 키 설정
 setApiKey(GEMINI_API_KEY);
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // FAQ 데이터 로드
@@ -130,6 +156,139 @@ function findCorrectionMatch(message, LEARNED_DATA) {
     return bestMatch;
 }
 
+
+// ========================
+// 질문 의도 분류 (Intent Classification)
+// ========================
+function classifyIntent(message) {
+    const msg = message.toLowerCase();
+
+    // 의도별 키워드 사전 (우선순위 순)
+    const intents = [
+        {
+            id: '가격_규격',
+            keywords: ['가격', '얼마', '단가', '비용', '원', '규격', '사이즈', '크기', '두께', '무게',
+                '스펙', '치수', '길이', '너비', '폭', '높이', 'mm', 'cm', 'kg',
+                '평당', '장당', '박스당', '묶음'],
+            patterns: [/\d+\s*(mm|cm|m|평|장)/, /얼마/]
+        },
+        {
+            id: '시공',
+            keywords: ['시공', '설치', '시방', '가이드', '방법', '붙이기', '크랙', '보수', '하자',
+                'DIY', '접착', '본드', '코너', '마감', '몰딩', '줄눈', '타카', '시멘트'],
+            patterns: [/어떻게\s*(시공|설치|붙|작업)/]
+        },
+        {
+            id: '배송',
+            keywords: ['배송', '배달', '운송', '택배', '당일', '출고', '도착', '배송비', '운임',
+                '화물', '착불', '선불', '퀵', '직배송'],
+            patterns: [/언제\s*(배송|도착|받)/, /며칠\s*(걸|소요)/]
+        },
+        {
+            id: '제품_소개',
+            keywords: ['종류', '제품', '소개', '장점', '특징', '차이', '비교', '추천', '뭐가',
+                '어떤', '용도', '방수', '내열', '내구성', '불연', '친환경'],
+            patterns: [/어떤\s*(제품|종류)/, /(뭐|무엇).*추천/]
+        },
+        {
+            id: '재고_샘플',
+            keywords: ['재고', '샘플', '견본', '실물', '쇼룸', '방문', '위치', '주소'],
+            patterns: [/재고\s*(있|확인|남)/, /샘플\s*(구매|주문|받)/]
+        },
+        {
+            id: '결제',
+            keywords: ['결제', '카드', '현금', '계좌', '세금계산서', '영수증', '할인', '대량'],
+            patterns: []
+        }
+    ];
+
+    let bestIntent = { id: '기타', score: 0 };
+
+    for (const intent of intents) {
+        let score = 0;
+        for (const kw of intent.keywords) {
+            if (msg.includes(kw)) score += 3;
+        }
+        for (const pattern of intent.patterns) {
+            if (pattern.test(msg)) score += 5;
+        }
+        if (score > bestIntent.score) {
+            bestIntent = { id: intent.id, score };
+        }
+    }
+
+    return bestIntent;
+}
+
+// 의도 기반 컨텍스트 필터링 — 관련 데이터만 우선 주입
+function filterContextByIntent(intent, { relevantFAQs, relevantProducts, ragResults, relevantLearned }) {
+    const contextBlocks = [];
+
+    // 관리자 학습 데이터 — 항상 최우선 (의도에 맞는 것만)
+    if (relevantLearned.length > 0) {
+        const filtered = relevantLearned.filter(l => {
+            const cat = (l.category || '').toLowerCase();
+            if (intent.id === '가격_규격') return cat.includes('가격') || cat.includes('제품') || cat.includes('규격');
+            if (intent.id === '배송') return cat.includes('배송');
+            if (intent.id === '시공') return cat.includes('시공');
+            return true; // 기타 의도는 모든 학습 데이터 포함
+        });
+        const items = (filtered.length > 0 ? filtered : relevantLearned).slice(0, 3);
+        contextBlocks.push(`[관리자 학습 지식 — 최우선 참고]\n${items.map(l => `Q: ${l.question}\nA: ${l.answer}`).join('\n\n')}`);
+    }
+
+    // 의도별 컨텍스트 우선순위 조정
+    if (intent.id === '가격_규격') {
+        // 가격/규격 질문 → 제품 데이터 최우선
+        if (relevantProducts.length > 0) {
+            contextBlocks.unshift(`[★ 핵심 참고: 매칭 제품의 가격·규격 정보]\n${relevantProducts.slice(0, 15).map(p => `${p.category} | ${p.productId} | 디자인: ${p.design} | 규격: ${p.spec} | 가격: ${p.price}`).join('\n')}`);
+        }
+        if (ragResults.length > 0) {
+            const priceRag = ragResults.filter(r => /가격|규격|스펙|사이즈/.test(r.content));
+            if (priceRag.length > 0) {
+                contextBlocks.push(`[의미 검색 — 가격/규격 관련]\n${priceRag.map(r => `(${r.score.toFixed(2)}) ${r.content}`).join('\n\n')}`);
+            }
+        }
+    } else if (intent.id === '시공') {
+        // 시공 질문 → RAG(시공 가이드) 최우선
+        if (ragResults.length > 0) {
+            contextBlocks.push(`[★ 핵심 참고: 시공 관련 정보]\n${ragResults.map(r => `(${r.score.toFixed(2)}) ${r.content}`).join('\n\n')}`);
+        }
+        if (relevantFAQs.length > 0) {
+            const installFAQs = relevantFAQs.filter(f => f.category === '시공');
+            if (installFAQs.length > 0) {
+                contextBlocks.push(`[시공 FAQ]\n${installFAQs.slice(0, 3).map(faq => `Q: ${faq.question}\nA: ${faq.answer}`).join('\n\n')}`);
+            }
+        }
+    } else if (intent.id === '배송') {
+        // 배송 질문 → 배송 FAQ 최우선
+        if (relevantFAQs.length > 0) {
+            const deliveryFAQs = relevantFAQs.filter(f => f.category === '배송');
+            if (deliveryFAQs.length > 0) {
+                contextBlocks.unshift(`[★ 핵심 참고: 배송 FAQ]\n${deliveryFAQs.slice(0, 3).map(faq => `Q: ${faq.question}\nA: ${faq.answer}`).join('\n\n')}`);
+            }
+        }
+        if (ragResults.length > 0) {
+            const deliveryRag = ragResults.filter(r => /배송|배달|택배|운송/.test(r.content));
+            if (deliveryRag.length > 0) {
+                contextBlocks.push(`[배송 관련 의미 검색]\n${deliveryRag.map(r => `(${r.score.toFixed(2)}) ${r.content}`).join('\n\n')}`);
+            }
+        }
+    } else {
+        // 기타 의도 — 기존 방식 유지 (모든 소스 포함)
+        if (ragResults.length > 0) {
+            contextBlocks.push(`[의미 검색 결과]\n${ragResults.map(r => `(${r.score.toFixed(2)}) ${r.content}`).join('\n\n')}`);
+        }
+        if (relevantFAQs.length > 0) {
+            contextBlocks.push(`[관련 FAQ]\n${relevantFAQs.slice(0, 3).map(faq => `Q: ${faq.question}\nA: ${faq.answer}`).join('\n\n')}`);
+        }
+        if (relevantProducts.length > 0) {
+            contextBlocks.push(`[매칭 제품 정보]\n${relevantProducts.slice(0, 10).map(p => `${p.category} | ${p.productId} | ${p.design} | ${p.spec} | ${p.price}`).join('\n')}`);
+        }
+    }
+
+    return contextBlocks;
+}
 
 // 고유 ID 생성
 function generateId() {
@@ -486,85 +645,83 @@ app.post('/api/chat', async (req, res) => {
         });
     }
 
-    // 2. AI 호출 (대화 히스토리 포함)
+    // 2. 의도 분류 (Intent Classification)
+    const intent = classifyIntent(message);
+    console.log(`🎯 의도 분류: ${intent.id} (점수: ${intent.score})`);
+
+    // 3. AI 호출 (대화 히스토리 포함)
     const historyContext = session.history.length > 0
-        ? `\n\n=== 이전 대화 맥락 (최근 ${Math.min(session.history.length, 10)}개) ===\n` +
-        session.history.slice(-10).map(h => `${h.role === 'user' ? '고객' : '어시스턴트'}: ${h.content.substring(0, 100)}`).join('\n')
+        ? `\n\n[이전 대화 맥락]\n` +
+        session.history.slice(-10).map(h => `${h.role === 'user' ? '고객' : '상담사'}: ${h.content.substring(0, 150)}`).join('\n')
         : '';
 
-    const systemPrompt = `${BRAND_KNOWLEDGE}
+    // 관리자 학습 데이터 (최우선)
+    const relevantLearned = findRelevantLearned(message, LEARNED_DATA);
 
-${relevantFAQs.length > 0 ? `=== 관련 FAQ 정보 (키워드 매칭됨) ===\n${relevantFAQs.map(faq => `[카테고리: ${faq.category}] Q: ${faq.question}\nA: ${faq.answer}`).join('\n\n')}` : ''}
+    // 의도 기반 컨텍스트 선별 주입
+    const contextBlocks = filterContextByIntent(intent, {
+        relevantFAQs, relevantProducts, ragResults, relevantLearned
+    });
 
-${relevantProducts.length > 0 ? `=== 관련 제품 카탈로그 정보 (제품번호 매칭됨) ===\n${relevantProducts.map(p => `[카테고리: ${p.category}] 제품번호: ${p.productId}, 디자인: ${p.design}, 규격: ${p.spec}, 가격: ${p.price}`).join('\n')}` : ''}
+    const contextSection = contextBlocks.length > 0
+        ? `\n\n=== 참고 자료 (질문 의도에 맞는 정보만 선별됨) ===\n${contextBlocks.join('\n\n')}`
+        : '';
 
-${ragResults.length > 0 ? `=== RAG 의미 검색 결과 (벡터 유사도 기반) ===\n${ragResults.map(r => `[유사도: ${r.score.toFixed(2)}] ${r.content}`).join('\n\n')}` : ''}
+    // Chain-of-Thought 시스템 프롬프트
+    const systemPrompt = `당신은 인팸(InteriorFamily)의 **수석 인테리어 자재 컨설턴트**입니다.
+10년 이상의 벽장재·바닥재·석재·금속패널 경험을 가진 전문가로서 고객에게 상담합니다.
 
-${historyContext}
+${BRAND_KNOWLEDGE}
 
-${(() => {
-            const relevantLearned = findRelevantLearned(message, LEARNED_DATA);
-            return relevantLearned.length > 0 ? `=== 관리자가 직접 학습시킨 지식 (가장 우선! 이 답변을 그대로 사용하세요) ===\n${relevantLearned.map(l => `[${l.category}] Q: ${l.question}\nA: ${l.answer}`).join('\n\n')}` : '';
-        })()}
+=== 🎯 질문 의도 분류 결과: 【${intent.id}】 ===
 
-=== 응답 지침 (매우 중요) ===
-1. 항상 한국어로 답변하세요.
-2. 인팸 제품과 서비스에 대한 질문에만 답변하세요.
-3. 위의 FAQ 정보가 있으면 그것을 기반으로 답변하되, 더 자연스럽게 재구성하세요.
-4. 모르는 정보는 솔직하게 답하고 담당자 연락처를 안내하세요.
-5. 이모티콘(이모지)은 절대 사용하지 마세요. 모든 이모지 금지!
-6. 답변은 간결하고 명확하게 해주세요.
-7. 이전 대화 맥락이 있으면 참고하되, 현재 질문에 집중하세요.
-8. 첫 문장에 "고객님, ~이 궁금하시군요!", "~에 대해 알려드릴게요!" 같은 앵무새식 인사말은 절대 하지 마세요. 바로 본론으로 들어가세요.
-9. 자연스럽고 전문적인 톤으로 답변하세요. 과도하게 친절하거나 로봇처럼 느껴지는 표현은 피하세요.
+이 고객의 질문은 【${intent.id}】 카테고리로 분류되었습니다.
+반드시 이 의도에 집중하여 답변하세요. 다른 카테고리(예: 배송, 시공 등)의 정보를 섞지 마세요.
 
-=== 구체화 질문 (Narrowing Down) 지침 (가장 중요) ===
-- 고객이 "얼마야?", "규격이 어떻게 돼?", "제품 설명해줘" 등 단순히 가격이나 스펙을 묻는 추상적인 질문을 할 경우, **반드시 구체적인 제품 카테고리나 제품번호(예: 703)를 알려달라고 정중하게 되물어보세요!** 
-- (예: "어떤 제품의 가격이 궁금하신가요? 제품 카테고리(예: WPC 월패널)나 제품번호(예: 703)를 알려주시면 상세 스펙과 가격을 안내해 드리겠습니다.")
-- 만약 위 "관련 제품 카탈로그 정보"에 구체적인 제품 데이터가 제공되었다면, 그 제품의 디자인, 규격, 가격 정보를 바탕으로 정확하게 답변해 주세요!
+=== 답변 생성 규칙 (Chain-of-Thought) ===
 
-=== 링크 제공 규칙 (가장 중요!) ===
-고객이 아래 주제를 언급하면 반드시 해당 직접 링크를 답변에 포함하세요.
+아래 단계를 따르되, 생각 과정은 출력하지 말고 최종 답변만 출력하세요:
 
-[시공 가이드 질문 시]
-- WPC 월패널 시공 → https://www.figma.com/deck/g3bpHP7liUM8SqVMdRF7TG/WPC-%EC%9B%94%ED%8C%A8%EB%84%90-%EC%8B%9C%EB%B0%A9%EC%84%9C?node-id=1-34&t=GSiwjmAWARU5gOKF-1&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1
-- 소프트 스톤 시공 → https://www.figma.com/deck/aWxDw4xzjjkXugo1xGr27n/%EC%86%8C%ED%94%84%ED%8A%B8-%EC%8A%A4%ED%86%A4-%EC%8B%9C%EB%B0%A9%EC%84%9C?node-id=1-34&t=HyB42bYAVeIbnNJW-1&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1
-- 카빙 스톤 시공 → https://www.figma.com/deck/eu75cWR555KYE8zjcUwEX4/%EC%B9%B4%EB%B9%99-%EC%8A%A4%ED%86%A4-%EC%8B%9C%EB%B0%A9%EC%84%9C?node-id=1-34&t=URjzXMQwVpsmjq7w-1&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1
-- 스텐 플레이트 시공 → https://www.figma.com/deck/WrQ9wtjUov9uouEKdZfhuc/%EC%8A%A4%ED%85%90-%ED%94%8C%EB%A0%88%EC%9D%B4%ED%8A%B8-%EC%8B%9C%EB%B0%A9%EC%84%9C?node-id=1-34
-- 크리스탈 블럭/유리 블럭 시공 → https://www.figma.com/deck/Umg9GpiqsfwGVAUE6b9ONA/%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%83%88-%EB%B8%94%EB%9F%AD-%EC%8B%9C%EB%B0%A9%EC%84%9C?node-id=1-34&t=Yf9tJPO7rdkFep4d-0&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1
-- 시멘트 블럭 시공 → https://www.figma.com/deck/0FFb3IQ7NhDg3kcfQKp4AV/%EC%8B%9C%EB%A9%98%ED%8A%B8-%EB%B8%94%EB%9F%AD-%EC%8B%9C%EB%B0%A9%EC%84%9C?node-id=1-34&t=kj8AeRSAiO1tKyF1-1&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1
+[1단계] 질문 의도 확인: 고객이 정확히 무엇을 알고 싶은지 파악하세요.
+  - 가격/규격 질문 → 반드시 구체적인 숫자(가격, 크기, 두께 등)를 포함하세요.
+  - 배송 질문 → 배송 방법, 기간, 비용에 대해서만 답변하세요.
+  - 시공 질문 → 시공 방법, 주의사항, 가이드에 대해서만 답변하세요.
+  - 제품 소개 → 제품 특징, 장점, 용도에 대해서만 답변하세요.
 
-[제품 카탈로그 (제품번호, 디자인, 규격, 가격 등 제품 세부정보 요청 시 해당 제품 링크 제공)]
-- 인팸 월패널 → https://drive.google.com/file/d/1DhpjbpkCQQyw9j-q1RGvhQ5Yf436E6uR/view
-- WPC 월패널 → https://drive.google.com/drive/u/4/folders/17BugkibGu-LGP-norCf4X3X_EQfY0d1w
-- 카빙 스톤 → https://drive.google.com/file/d/1qxKnYksEV9K8ZC77taQHjKb6CjINW6DQ/view
-- 소프트 스톤 → https://drive.google.com/file/d/1xG1LehNxCCaojPaszL3TQHw5MUW_PAoT/view
-- 라이트 스톤 → https://drive.google.com/file/d/1AgZiGb1HhlLCTO0cFXtsufaOTjUuTTsj/view
-- 인팸 스톤 → https://drive.google.com/file/d/1UMyjUbApBi7NzN-BRPGtZ6dMjSZ-dqq4/view
-- 스텐 플레이트 → https://drive.google.com/file/d/14z48YrSdruEsD3yb8KKiz5wnkWTEjcXG/view
-- 크리스탈 블럭 → https://drive.google.com/file/d/1YDc4bJViOKKYoHmZP_a-KZxCH25Txe9D/view
-- 아이스 플레이트 → https://drive.google.com/file/d/1TxWqYVf8HmRtHoJx2DIeQ7tflqe-2yew/view
-- 아크릴 플레이트 → https://drive.google.com/file/d/1IJ9GzJNPHfdAONfwlH3lW2o35E_-mZLG/view
-- 시멘트 블럭 → https://drive.google.com/file/d/1AXmkXcqt5ZohC22iMsECrZqsiSqI9RR6/view
-- 스타 스톤 → https://drive.google.com/file/d/1-cHqNT1Treb_8qg3z7uGC-iQre0pGDRO/view
-- 하드 스톤 → https://drive.google.com/file/d/1JLg8ntfBKLzruBlObTNzxivj2e5w7NQP/view
-- 노이즈 템바보드 → https://drive.google.com/file/d/1SNrQblpUrlSAhgZZ63o274xtKyCBkV-q/view
-- 브릭 스톤 → https://drive.google.com/file/d/1ZtEa5n3Yqt3Cn4OJ4xWC9kG2YF8hQ5Jk/view
-- 플로우 메탈 → https://drive.google.com/file/d/18L3mmP9Mrh6wCuwckFrscP7s9BYUoSPH/view
-- 3D 블럭 → https://drive.google.com/file/d/17ABwLtSQ4cSicq36fZEPN4-RqYOogxwp/view
-- 오로라 스톤 → https://drive.google.com/file/d/1jyndgTRs1jFz8M6FK6g3pKws0xP1RzcK/view
-- 오브제 프레임 → https://drive.google.com/file/d/1eu2LI2TReLFnvhAqCkPv_SUaLgA3gLIl/view
-- 시멘트 플레이트 → https://drive.google.com/file/d/1sj-SvwSxeae4E5l9gtaqCXxJIMWgcsmK/view
-- 템바보드 → https://drive.google.com/file/d/10vJKO1wZaOOUVoJBwNfjHgED_at_XEME/view
-- 재료 분리대 → https://drive.google.com/file/d/1zY1a-SGfIaFtZzfefy7-zE2x7D4nRWRf/view
+[2단계] 참고 자료에서 해당 의도에 맞는 정보만 선택하세요. 관련 없는 정보는 무시하세요.
 
-[재고/배송] 재고 현황표: https://drive.google.com/drive/folders/1y5C5T12d3VrMG2H-7N3CNIVMJfqDEY2d
-[샘플 구매] https://edtc101.cafe24.com/skin-skin16/index.html
-[쇼룸/위치] 네이버 지도: https://naver.me/G1wCKANl
-[시공 사례] https://www.notion.so/edtc/f71f248770b5409ba158a210ab71db7d?v=600a30831a484786b25e4f55293ff749
-[유튜브] https://www.youtube.com/@interior__family
+[3단계] 전문가 관점으로 답변을 구성하세요.
+  - 참고 자료에 구체적 정보가 있으면 그것을 근거로 정확히 답변하세요.
+  - 참고 자료에 없는 정보는 절대 지어내지 마세요. "정확한 사항은 담당자 확인이 필요합니다"로 안내하세요.
 
-중요: 링크를 제공할 때는 🔗 이모티콘을 앞에 붙여주세요.
+=== 대화 스타일 ===
+
+- **격식체 필수**: "~합니다", "~드리겠습니다" ("~해요", "~이에요" 금지)
+- **인사말 금지**: 첫 문장부터 바로 본론
+- **간결하되 깊이 있게**: 3~5문장으로 핵심 + 전문가 인사이트. 필요시 번호 항목 정리.
+
+=== 후속 질문 생성 (필수) ===
+
+답변 본문을 작성한 후, 반드시 마지막에 아래 형식으로 후속 질문 3개를 추가하세요.
+고객이 현재 질문 맥락에서 다음에 궁금해할 만한 실용적인 질문을 제안하세요.
+
+---SUGGESTED---
+["후속 질문 1", "후속 질문 2", "후속 질문 3"]
+---END---
+
+예시:
+- 가격 질문 후 → ["샘플 구매는 어떻게 하나요?", "이 제품 재고가 있나요?", "시공 방법이 궁금합니다"]
+- 배송 질문 후 → ["당일 배송 가능한 제품은?", "배송비는 얼마인가요?", "대량 주문도 가능한가요?"]
+
+=== 링크 활용 ===
+
+관련 제품/서비스 언급 시 아래 링크를 자연스럽게 포함하세요:
+- 재고 확인: https://drive.google.com/drive/folders/1y5C5T12d3VrMG2H-7N3CNIVMJfqDEY2d
+- 샘플 구매: https://buly.kr/6MrEuTY
+- 시공 사례: https://www.notion.so/edtc/f71f248770b5409ba158a210ab71db7d?v=600a30831a484786b25e4f55293ff749
+- 쇼룸 위치: https://naver.me/G1wCKANl
+- 전체 카탈로그: https://link.inpock.co.kr/interiorfamily
+${contextSection}${historyContext}
 
 고객 질문: ${message}`;
 
@@ -575,23 +732,47 @@ ${(() => {
                 history: session.history.slice(-10).map(h => ({
                     role: h.role, parts: [{ text: h.content }]
                 })),
-                generationConfig: { maxOutputTokens: 1200, temperature: 0.7 }
+                generationConfig: {
+                    maxOutputTokens: 2500,
+                    temperature: 0.1,
+                    topP: 0.85,
+                    topK: 20
+                }
             });
             const result = await chat.sendMessage(systemPrompt);
             aiResponse = result.response.text();
-            console.log(`✅ AI 응답 성공 (시도 ${attempt})`);
+            console.log(`✅ AI 응답 성공 (시도 ${attempt}, 모델: gemini-2.5-pro, 의도: ${intent.id})`);
             break;
         } catch (err) {
             const isQuota = err.status === 429;
             const isNotFound = err.status === 404;
             console.log(`AI 시도 ${attempt} 실패 (${err.status}):`, isQuota ? '할당량 초과' : isNotFound ? '모델 없음' : err.message);
             if (isNotFound || attempt === 2) break;
-            if (isQuota) await new Promise(r => setTimeout(r, 2000));
+            if (isQuota) await new Promise(r => setTimeout(r, 3000));
         }
     }
 
-    // AI 응답 성공
+    // AI 응답 성공 — 후속 질문 추출
     if (aiResponse) {
+        let suggestedQuestions = [];
+        const suggestMatch = aiResponse.match(/---SUGGESTED---(.*?)---END---/s);
+        if (suggestMatch) {
+            try {
+                let jsonStr = suggestMatch[1].trim();
+                if (jsonStr.includes('```json')) {
+                    jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();
+                } else if (jsonStr.includes('```')) {
+                    jsonStr = jsonStr.split('```')[1].split('```')[0].trim();
+                }
+                suggestedQuestions = JSON.parse(jsonStr);
+                if (!Array.isArray(suggestedQuestions)) suggestedQuestions = [];
+            } catch (e) {
+                console.log('후속 질문 파싱 실패:', e.message);
+            }
+            // 응답에서 후속 질문 블록 제거
+            aiResponse = aiResponse.replace(/---SUGGESTED---.*?---END---/s, '').trim();
+        }
+
         setCache(message, aiResponse, matchedFAQsForClient);
         session.history.push({ role: 'user', content: message });
         session.history.push({ role: 'model', content: aiResponse });
@@ -599,18 +780,30 @@ ${(() => {
         return res.json({
             response: aiResponse,
             matchedFAQs: matchedFAQsForClient,
-            ragSources: ragResults.length > 0 ? ragResults.map(r => ({ title: r.title, score: r.score.toFixed(2), category: r.category })) : []
+            ragSources: ragResults.length > 0 ? ragResults.map(r => ({ title: r.title, score: r.score.toFixed(2), category: r.category, content: r.content || '' })) : [],
+            suggestedQuestions,
+            intent: intent.id
         });
     }
 
-    // 스마트 폴백
+    // 스마트 폴백 + 의도 기반 후속 질문
     console.log('📚 스마트 폴백 사용');
     const fallbackResponse = buildSmartFallback(message, relevantFAQs);
+    const fallbackSuggestions = {
+        '가격_규격': ['샘플 구매는 어떻게 하나요?', '재고가 있나요?', '대량 주문 할인도 가능한가요?'],
+        '배송': ['당일 배송 가능한 제품은 무엇인가요?', '배송비는 얼마인가요?', '제주/도서산간 배송도 가능한가요?'],
+        '시공': ['시공 시 필요한 부자재는 뭔가요?', 'DIY 시공이 가능한가요?', '시공 후 관리 방법은?'],
+        '제품_소개': ['어떤 제품이 가장 인기있나요?', '샘플을 받아볼 수 있나요?', '쇼룸에서 직접 볼 수 있나요?'],
+        '재고_샘플': ['당일 배송이 가능한가요?', '가격이 어떻게 되나요?', '대량 구매 시 할인이 되나요?'],
+        '기타': ['제품 종류가 어떻게 되나요?', '배송은 어떻게 진행되나요?', '쇼룸 위치가 어디인가요?']
+    };
     setCache(message, fallbackResponse, matchedFAQsForClient);
     res.json({
         response: fallbackResponse,
         fromFallback: true,
-        matchedFAQs: matchedFAQsForClient
+        matchedFAQs: matchedFAQsForClient,
+        suggestedQuestions: fallbackSuggestions[intent.id] || fallbackSuggestions['기타'],
+        intent: intent.id
     });
 });
 
@@ -908,6 +1101,190 @@ ${conversation}
     }
 });
 
+// 문서 파일 업로드 → 텍스트 추출 → AI 자동 파싱 및 학습
+app.post('/api/admin/upload-knowledge', adminAuth, upload.array('documents'), async (req, res) => {
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: '업로드된 파일이 없습니다.' });
+    }
+
+    try {
+        let extractedText = '';
+
+        for (const file of req.files) {
+            const ext = path.extname(file.originalname).toLowerCase();
+            const filePath = file.path;
+
+            try {
+                if (ext === '.txt') {
+                    extractedText += `\n[${file.originalname} 문서 내용]\n` + fs.readFileSync(filePath, 'utf8') + '\n';
+                } else if (ext === '.pdf') {
+                    const dataBuffer = fs.readFileSync(filePath);
+                    const pdfData = await pdf(dataBuffer);
+                    extractedText += `\n[${file.originalname} 문서 내용]\n` + pdfData.text + '\n';
+                } else if (ext === '.xlsx' || ext === '.xls' || ext === '.csv') {
+                    const workbook = xlsx.readFile(filePath);
+                    let excelText = '';
+                    workbook.SheetNames.forEach(sheetName => {
+                        const sheet = workbook.Sheets[sheetName];
+                        const json = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+                        excelText += `=== Sheet: ${sheetName} ===\n`;
+                        json.forEach(row => {
+                            if (row.length > 0) excelText += row.join(' | ') + '\n';
+                        });
+                    });
+                    extractedText += `\n[${file.originalname} 문서 내용]\n` + excelText + '\n';
+                }
+            } catch (err) {
+                console.error(`파일 처리 오류 (${file.originalname}):`, err);
+            } finally {
+                try { fs.unlinkSync(filePath); } catch (e) { } // 임시 파일 삭제
+            }
+        }
+
+        if (!extractedText.trim()) {
+            return res.status(400).json({ error: '파일에서 텍스트를 추출하지 못했습니다.' });
+        }
+
+        // 텍스트를 일정 크기로 자르기 (10000자 기준)
+        const chunkSize = 10000;
+        const chunks = [];
+        for (let i = 0; i < extractedText.length; i += chunkSize) {
+            chunks.push(extractedText.slice(i, i + chunkSize));
+        }
+
+        let totalExtractedItems = [];
+
+        // 각 청크마다 Gemini 호출하여 Q&A 추출
+        for (const [index, chunk] of chunks.entries()) {
+            const analyzePrompt = `너는 인팸(InteriorFamily) 벽장재 전문 회사의 AI 어시스턴트야.
+아래는 직원이 새로 업로드한 실무 문서(또는 문서의 일부분)야. 이 내용을 분석해서 고객 서비스 AI가 바로 써먹을 수 있는 강력한 지식(Q&A)으로 변환해줘.
+
+=== 문서 내용 (파트 ${index + 1}/${chunks.length}) ===
+${chunk}
+=== 끝 ===
+
+지시사항:
+1. 중요한 정보들을 뽑아내서 "질문"과 "답변" 형태의 쌍으로 여러 개 정리해 내.
+2. 답변은 문서의 내용을 완전히 반영하되, 고객에게 설명하듯 친절하고 전문적으로 작성해.
+3. 관련 '키워드' 목록을 풍부하게 뽑아줘.
+
+반드시 다음 형식의 JSON 배열로만 정답을 출력해 (다른 말은 절대 쓰지 마):
+---LEARNED---
+[
+  { "category": "제품|시공|배송|견격|기타", "question": "명확한 질문 예시", "answer": "상세한 답변", "keywords": ["키워드1", "키워드2"] }
+]
+---END---`;
+
+            const result = await model.generateContent(analyzePrompt);
+            let aiResponse = result.response.text();
+
+            const match = aiResponse.match(/---LEARNED---\s*([\s\S]*?)\s*---END---/);
+            if (match && match[1]) {
+                try {
+                    const parsedItems = JSON.parse(match[1]);
+                    if (Array.isArray(parsedItems)) {
+                        totalExtractedItems.push(...parsedItems);
+                    }
+                } catch (parseErr) {
+                    console.error('문서 청크 파싱 오류:', parseErr);
+                }
+            }
+        }
+
+        if (totalExtractedItems.length === 0) {
+            return res.status(400).json({ error: '문서는 인식되었으나 유의미한 Q&A 지식을 추출하지 못했습니다. 형식을 확인해주세요.' });
+        }
+
+        // learned-data.json 에 추가
+        const existingData = loadLearnedData();
+        for (const item of totalExtractedItems) {
+            existingData.push({
+                id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
+                category: item.category || '기타',
+                question: item.question,
+                answer: item.answer,
+                keywords: item.keywords || [],
+                source: 'document_upload',
+                learnedAt: new Date().toISOString()
+            });
+        }
+        saveLearnedData(existingData);
+
+        // 비동기로 RAG 벡터 스토어 업데이트
+        buildVectorStore().then(r => console.log('✅ 문서 업로드 후 RAG 재빌드 완료:', r.totalDocuments)).catch(console.error);
+
+        res.json({
+            success: true,
+            extractedCount: totalExtractedItems.length,
+            chunksExtracted: totalExtractedItems.length,
+            ragTotal: existingData.length + loadFAQData().length + loadProductData().length,
+            items: totalExtractedItems.map(item => ({
+                category: item.category || '기타',
+                question: item.question,
+                answer: item.answer,
+                keywords: item.keywords || []
+            }))
+        });
+    } catch (error) {
+        console.error('파일 업로드 파싱 오류:', error);
+        res.status(500).json({ error: '파일 처리 및 분석 중 에러가 발생했습니다.', detail: error.message });
+    }
+});
+
+// AI로 답변 개선하기
+app.post('/api/admin/improve-answer', async (req, res) => {
+    const { question, currentAnswer } = req.body;
+    if (!question && !currentAnswer) {
+        return res.status(400).json({ error: '질문 또는 현재 답변이 필요합니다.' });
+    }
+
+    try {
+        // 관련 지식 검색
+        const relevantFAQs = question ? searchFAQ(question, FAQ_DATA).slice(0, 3) : [];
+        const relevantLearned = question ? findRelevantLearned(question, LEARNED_DATA).slice(0, 3) : [];
+        let ragResults = [];
+        if (question && vectorStore) {
+            try { ragResults = vectorStore.search(question, 3); } catch (e) { }
+        }
+
+        const knowledgeContext = [
+            relevantFAQs.length > 0 ? `[FAQ 정보]\n${relevantFAQs.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n')}` : '',
+            ragResults.length > 0 ? `[RAG 검색 결과]\n${ragResults.map(r => r.content).join('\n\n')}` : '',
+            relevantLearned.length > 0 ? `[학습된 지식]\n${relevantLearned.map(l => `Q: ${l.question}\nA: ${l.answer}`).join('\n\n')}` : ''
+        ].filter(Boolean).join('\n\n');
+
+        const improvePrompt = `너는 인팸(InteriorFamily) 벽장재 전문 회사의 베테랑 영업 매니저야.
+
+아래 고객 질문에 대한 기존 답변을 더 정확하고, 더 자연스럽고, 더 전문적으로 개선해줘.
+
+=== 고객 질문 ===
+${question || '(질문 없음)'}
+
+=== 현재 답변 (개선 필요) ===
+${currentAnswer || '(답변 없음)'}
+
+${knowledgeContext ? `=== 참고할 수 있는 지식 데이터 ===\n${knowledgeContext}` : ''}
+
+=== 개선 지침 ===
+1. 기존 답변의 틀린 정보는 수정하고, 부족한 정보는 보완해.
+2. 편안하고 자연스러운 대화체로 작성해. "~해요", "~드릴게요" 존댓말 사용.
+3. "안녕하세요", "반갑습니다" 같은 인사말은 절대 넣지 마. 바로 본론.
+4. 실무 팁이나 현장 경험을 자연스럽게 섞어줘.
+5. 마지막에 자연스러운 후속 질문 1개를 넣어줘.
+6. 위 "참고할 수 있는 지식 데이터"가 있으면 적극 활용해.
+7. 답변만 출력해. 다른 설명이나 메타 정보는 쓰지 마.`;
+
+        const result = await model.generateContent(improvePrompt);
+        const improved = result.response.text();
+
+        console.log('🤖 AI 답변 개선 완료:', (question || '').substring(0, 30));
+        res.json({ success: true, improvedAnswer: improved });
+    } catch (error) {
+        console.error('AI 답변 개선 오류:', error);
+        res.status(500).json({ error: 'AI 답변 개선 중 오류가 발생했습니다.' });
+    }
+});
+
 // 답변 바로수정 → 학습 데이터로 저장
 app.post('/api/admin/learn-correction', (req, res) => {
     const { question, answer } = req.body;
@@ -1048,6 +1425,833 @@ setInterval(() => {
     });
 }, 3600000);
 
+// ========================
+// 회사소개 콘텐츠 API
+// ========================
+const COMPANY_CONTENT_FILE = path.join(__dirname, 'company-content.json');
+
+app.get('/api/company-content', (req, res) => {
+    try {
+        if (fs.existsSync(COMPANY_CONTENT_FILE)) {
+            const data = JSON.parse(fs.readFileSync(COMPANY_CONTENT_FILE, 'utf8'));
+            res.json(data);
+        } else {
+            res.status(404).json({ error: '저장된 콘텐츠가 없습니다.' });
+        }
+    } catch (e) {
+        res.status(500).json({ error: '콘텐츠 로드 실패' });
+    }
+});
+
+app.post('/api/company-content', (req, res) => {
+    try {
+        const { content } = req.body;
+        if (!content) return res.status(400).json({ error: '콘텐츠가 비어있습니다.' });
+        const data = { content, updatedAt: new Date().toISOString() };
+        fs.writeFileSync(COMPANY_CONTENT_FILE, JSON.stringify(data, null, 2), 'utf8');
+        console.log('🏢 회사소개 콘텐츠 저장됨');
+        res.json({ success: true, updatedAt: data.updatedAt });
+    } catch (e) {
+        res.status(500).json({ error: '저장 실패' });
+    }
+});
+
+// ========================
+// 인팸 디자인 AI — 이미지 제작소 API
+// ========================
+
+// 디자인 분석: 파일 업로드 → Gemini Vision으로 톤앤매너 분석
+app.post('/api/design/analyze', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: '파일이 없습니다' });
+
+        const filePath = req.file.path;
+        const fileBuffer = fs.readFileSync(filePath);
+        const base64Data = fileBuffer.toString('base64');
+        const mimeType = req.file.mimetype || 'image/png';
+
+        console.log(`🎨 디자인 분석 요청: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)}KB)`);
+
+        const analyzeModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+
+        const prompt = `당신은 전문 디자인 분석가입니다. 업로드된 이미지/문서에서 디자인 톤앤매너를 분석해주세요.
+
+다음 항목들을 JSON 형식으로 분석 결과를 반환해주세요:
+
+1. colors: 감지된 주요 색상 최대 6개 (hex 코드와 용도를 포함)
+2. fonts: 감지된 폰트/타이포그래피 스타일 (폰트명 추정, 용도, 굵기)
+3. styles: 디자인 스타일 키워드 (예: "모던", "미니멀", "기업형", "고급스러운" 등)
+4. layout: 레이아웃 구조 한국어로 설명 (2-3문장)
+
+반드시 JSON 형식으로 반환하세요. 코드 블록 없이 순수 JSON만 반환하세요.
+
+예시:
+{
+  "colors": [{"hex": "#3a7d44", "usage": "주요 브랜드 색상"}, {"hex": "#ffffff", "usage": "배경"}],
+  "fonts": [{"name": "Pretendard", "usage": "제목", "weight": "Bold"}, {"name": "Noto Sans KR", "usage": "본문", "weight": "Regular"}],
+  "styles": ["모던", "깔끔한", "기업형"],
+  "layout": "상단 헤더 + 중앙 콘텐츠 영역 + 하단 푸터 구조..."
+}`;
+
+        const result = await analyzeModel.generateContent([
+            { text: prompt },
+            { inlineData: { mimeType, data: base64Data } }
+        ]);
+
+        const responseText = result.response.text();
+        console.log('✅ 디자인 분석 완료');
+
+        // JSON 파싱 시도
+        let analysisData;
+        try {
+            // ```json ... ``` 블록 제거
+            const cleaned = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+            analysisData = JSON.parse(cleaned);
+        } catch {
+            // 파싱 실패 시 기본 구조 반환
+            analysisData = {
+                colors: [{ hex: '#3a7d44', usage: '주요 색상' }, { hex: '#ffffff', usage: '배경' }],
+                fonts: [{ name: '감지 불가', usage: '전체', weight: '-' }],
+                styles: ['분석 중 파싱 오류'],
+                layout: responseText.substring(0, 300),
+            };
+        }
+
+        // 파일 정리
+        try { fs.unlinkSync(filePath); } catch { }
+
+        res.json(analysisData);
+    } catch (err) {
+        console.error('❌ 디자인 분석 오류:', err.message);
+        res.status(500).json({ error: '분석 중 오류 발생: ' + err.message });
+    }
+});
+
+// 디자인 수정: Nano Banana (gemini-3.1-flash-image-preview) — 네이티브 이미지 생성/편집
+app.post('/api/design/modify', async (req, res) => {
+    try {
+        const { message, analysis, sessionId, attachmentDataUrl, imageUrl } = req.body;
+
+        if (!message && !imageUrl && !attachmentDataUrl) return res.status(400).json({ error: '메시지가 없습니다' });
+
+        console.log(`🎨 디자인 수정 요청 (Nano Banana): ${(message || '').substring(0, 50)}...`);
+
+        let contextInfo = '';
+        if (analysis) {
+            contextInfo = `
+현재 학습된 톤앤매너:
+- 색상 팔레트: ${(analysis.colors || []).map(c => `${c.hex}(${c.usage})`).join(', ')}
+- 폰트: ${(analysis.fonts || []).map(f => `${f.name}(${f.usage})`).join(', ')}
+- 디자인 스타일: ${(analysis.styles || []).join(', ')}
+- 레이아웃: ${analysis.layout || '없음'}`;
+        }
+
+        const systemPrompt = `당신은 인팸(InteriorFamily)의 전문 디자인 AI 어시스턴트입니다.
+사용자의 디자인 수정/생성 요청에 대해 전문적으로 대응합니다.
+
+${contextInfo}
+
+# 응답 규칙:
+1. 이미지가 첨부된 경우, 이미지를 분석하고 수정된 이미지를 생성해주세요.
+2. 이미지 생성/수정 요청이면 반드시 이미지를 생성하여 함께 반환하세요.
+3. 한국어 합니다체로 답변하세요.
+4. 디자인 변경 시 구체적인 안내와 함께 수정된 이미지를 제공하세요.
+5. 색상은 HEX 코드, 폰트는 구체적 이름으로 제안하세요.
+
+사용자 요청:`;
+
+        // Nano Banana용 콘텐츠 구성
+        const contents = [];
+        const promptText = systemPrompt + '\n' + (message || '이 이미지를 분석해주세요.');
+
+        const contentParts = [{ text: promptText }];
+
+        // 첨부 이미지 처리 (data URL)
+        if (attachmentDataUrl && attachmentDataUrl.startsWith('data:')) {
+            const match = attachmentDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+                contentParts.push({
+                    inlineData: { mimeType: match[1], data: match[2] }
+                });
+            }
+        }
+
+        // URL 이미지 다운로드 후 첨부
+        if (imageUrl) {
+            try {
+                const imgResp = await fetch(imageUrl);
+                if (imgResp.ok) {
+                    const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+                    const imgMime = imgResp.headers.get('content-type') || 'image/jpeg';
+                    contentParts.push({
+                        inlineData: { mimeType: imgMime, data: imgBuffer.toString('base64') }
+                    });
+                }
+            } catch (e) {
+                console.warn('이미지 다운로드 실패:', e.message);
+            }
+        }
+
+        contents.push({ role: 'user', parts: contentParts });
+
+        // Nano Banana로 이미지 생성 시도
+        let responseText = '';
+        let generatedImageBase64 = null;
+
+        try {
+            const result = await genAINB.models.generateContent({
+                model: 'gemini-3.1-flash-image-preview',
+                contents: contents,
+                config: {
+                    responseModalities: ['TEXT', 'IMAGE'],
+                },
+            });
+
+            // 응답 파싱: 텍스트 + 이미지
+            if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+                for (const part of result.candidates[0].content.parts) {
+                    if (part.text) {
+                        responseText += part.text;
+                    } else if (part.inlineData) {
+                        generatedImageBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                        console.log('🖼️ 이미지 생성 완료!');
+                    }
+                }
+            }
+        } catch (nbErr) {
+            console.warn('⚠️ Nano Banana 실패, gemini-2.5-pro로 펴백:', nbErr.message);
+            // 펴백: gemini-2.5-pro
+            const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+            const fallbackParts = contentParts;
+            const fallbackResult = await fallbackModel.generateContent(fallbackParts);
+            responseText = fallbackResult.response.text();
+        }
+
+        if (!responseText && !generatedImageBase64) {
+            responseText = '이미지가 생성되었습니다.';
+        }
+
+        console.log(`✅ 디자인 AI 응답 완료 (Nano Banana${generatedImageBase64 ? ' + 이미지' : ''})`);
+
+        res.json({
+            response: responseText,
+            generatedImage: generatedImageBase64,
+        });
+    } catch (err) {
+        console.error('❌ 디자인 수정 오류:', err.message);
+        res.status(500).json({ response: '⚠️ 처리 중 오류가 발생했습니다: ' + err.message });
+    }
+});
+
+// URL에서 이미지 추출
+app.post('/api/design/extract-images', async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL이 없습니다' });
+
+        console.log(`🔗 이미지 추출 요청: ${url}`);
+
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            },
+            redirect: 'follow',
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+
+        const images = [];
+        const seen = new Set();
+
+        $('img').each((_, el) => {
+            let src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src') || '';
+            const alt = $(el).attr('alt') || '';
+
+            if (!src || src.startsWith('data:')) return;
+
+            // 상대 URL → 절대 URL 변환
+            try {
+                src = new URL(src, url).href;
+            } catch { return; }
+
+            // 중복 및 아이콘/트래커 제외
+            if (seen.has(src)) return;
+            if (src.includes('pixel') || src.includes('tracking') || src.includes('1x1')) return;
+            if (src.endsWith('.svg') && !alt) return;
+
+            seen.add(src);
+            images.push({ url: src, alt: alt.substring(0, 100) });
+        });
+
+        // OG 이미지 추가
+        const ogImage = $('meta[property="og:image"]').attr('content');
+        if (ogImage && !seen.has(ogImage)) {
+            try {
+                const ogUrl = new URL(ogImage, url).href;
+                images.unshift({ url: ogUrl, alt: 'OG Image' });
+            } catch { }
+        }
+
+        console.log(`✅ 이미지 ${images.length}개 추출 완료`);
+        res.json({ images: images.slice(0, 30) });
+    } catch (err) {
+        console.error('❌ 이미지 추출 오류:', err.message);
+        res.status(500).json({ error: '이미지 추출 실패: ' + err.message });
+    }
+});
+
+// 디자인 생성: 프리셋 기반 에셋 생성
+app.post('/api/design/generate', async (req, res) => {
+    try {
+        const { preset, analysis, parameters } = req.body;
+        console.log(`🎨 디자인 생성 요청: ${preset}`);
+
+        const designModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+
+        let contextInfo = '';
+        if (analysis) {
+            contextInfo = `학습된 톤앤매너: 색상(${(analysis.colors || []).map(c => c.hex).join(',')}), 폰트(${(analysis.fonts || []).map(f => f.name).join(',')}), 스타일(${(analysis.styles || []).join(',')})`;
+        }
+
+        const prompt = `당신은 전문 웹 디자인 AI입니다. 다음 요청에 맞는 HTML 코드를 생성해주세요.
+
+${contextInfo}
+
+작업 유형: ${preset}
+추가 파라미터: ${JSON.stringify(parameters || {})}
+
+# 규칙:
+1. 완전한 HTML 코드를 생성하세요 (인라인 CSS 포함).
+2. 학습된 색상 팔레트와 폰트를 적용하세요.
+3. 모바일 반응형으로 제작하세요.
+4. Google Fonts를 사용하세요 (Pretendard, Noto Sans KR).
+5. 한국어 콘텐츠로 작성하세요.
+
+완전한 HTML 코드만 반환하세요.`;
+
+        const result = await designModel.generateContent(prompt);
+        const responseText = result.response.text();
+
+        res.json({ html: responseText, preset });
+    } catch (err) {
+        console.error('❌ 디자인 생성 오류:', err.message);
+        res.status(500).json({ error: '생성 중 오류 발생: ' + err.message });
+    }
+});
+
+// ========================
+// 콘텐츠 자동화 대시보드 백엔드 자동 실행
+// ========================
+const { spawn } = require('child_process');
+let contentDashboardProcess = null;
+
+function startContentDashboard() {
+    const backendDir = path.resolve(__dirname, '..', '콘텐츠 자동화 대시보드', 'backend');
+
+    if (!fs.existsSync(backendDir)) {
+        console.log('⚠️ 콘텐츠 자동화 대시보드 폴더를 찾을 수 없습니다:', backendDir);
+        return;
+    }
+
+    console.log('🎬 콘텐츠 자동화 대시보드 백엔드 시작 중...');
+
+    contentDashboardProcess = spawn('python', ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000'], {
+        cwd: backendDir,
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }
+    });
+
+    contentDashboardProcess.stdout.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg) console.log(`  [콘텐츠] ${msg}`);
+    });
+
+    contentDashboardProcess.stderr.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg && !msg.includes('INFO:')) console.log(`  [콘텐츠 ERR] ${msg}`);
+        // uvicorn은 INFO를 stderr로 출력
+        if (msg.includes('Uvicorn running') || msg.includes('Started server')) {
+            console.log('✅ 콘텐츠 자동화 대시보드: http://localhost:8000');
+        }
+    });
+
+    contentDashboardProcess.on('error', (err) => {
+        console.log('⚠️ 콘텐츠 대시보드 실행 실패:', err.message);
+        console.log('   → Python/uvicorn이 설치되어 있는지 확인해주세요');
+    });
+
+    contentDashboardProcess.on('exit', (code) => {
+        if (code !== null && code !== 0) {
+            console.log(`⚠️ 콘텐츠 대시보드 종료 (코드: ${code})`);
+        }
+        contentDashboardProcess = null;
+    });
+}
+
+// 서버 종료 시 FastAPI도 함께 종료
+function cleanupContentDashboard() {
+    if (contentDashboardProcess) {
+        console.log('🔒 콘텐츠 대시보드 백엔드 종료...');
+        contentDashboardProcess.kill();
+        contentDashboardProcess = null;
+    }
+}
+
+process.on('exit', () => { cleanupContentDashboard(); cleanupLayeredService(); });
+process.on('SIGINT', () => { cleanupContentDashboard(); cleanupLayeredService(); process.exit(); });
+process.on('SIGTERM', () => { cleanupContentDashboard(); cleanupLayeredService(); process.exit(); });
+
+// ========================
+// Qwen-Image-Layered 서비스 자동 실행
+// ========================
+let layeredServiceProcess = null;
+
+function startLayeredService() {
+    const scriptPath = path.resolve(__dirname, '.agent', '인팸이미지', 'scripts', 'layered_service.py');
+
+    if (!fs.existsSync(scriptPath)) {
+        console.log('⚠️ Qwen-Image-Layered 스크립트를 찾을 수 없습니다:', scriptPath);
+        return;
+    }
+
+    console.log('🧠 Qwen-Image-Layered 서비스 시작 중...');
+
+    layeredServiceProcess = spawn('python', [scriptPath], {
+        cwd: path.dirname(scriptPath),
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }
+    });
+
+    layeredServiceProcess.stdout.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg) console.log(`  [레이어] ${msg}`);
+    });
+
+    layeredServiceProcess.stderr.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg && !msg.includes('INFO:')) console.log(`  [레이어 ERR] ${msg}`);
+        if (msg.includes('Uvicorn running') || msg.includes('Started server')) {
+            console.log('✅ Qwen-Image-Layered 서비스: http://localhost:8100');
+        }
+    });
+
+    layeredServiceProcess.on('error', (err) => {
+        console.log('⚠️ Qwen-Image-Layered 실행 실패:', err.message);
+    });
+
+    layeredServiceProcess.on('exit', (code) => {
+        if (code !== null && code !== 0) console.log(`⚠️ Qwen-Image-Layered 종료 (${code})`);
+        layeredServiceProcess = null;
+    });
+}
+
+function cleanupLayeredService() {
+    if (layeredServiceProcess) {
+        console.log('🔒 Qwen-Image-Layered 서비스 종료...');
+        layeredServiceProcess.kill();
+        layeredServiceProcess = null;
+    }
+}
+
+// Qwen-Image-Layered 프록시 엔드포인트
+app.all('/api/layered/*', async (req, res) => {
+    try {
+        const targetPath = req.originalUrl;
+        const targetUrl = `http://localhost:8100${targetPath}`;
+
+        const fetchOpts = { method: req.method, headers: {} };
+
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+            if (req.is('multipart/form-data')) {
+                // multipart 폼데이터는 multer로 처리된 후이므로, 직접 전달이 필요
+                // 여기서는 JSON body만 프록시
+                fetchOpts.headers['Content-Type'] = 'application/json';
+                fetchOpts.body = JSON.stringify(req.body);
+            } else {
+                fetchOpts.headers['Content-Type'] = req.get('Content-Type') || 'application/json';
+                fetchOpts.body = JSON.stringify(req.body);
+            }
+        }
+
+        const proxyRes = await fetch(targetUrl, fetchOpts);
+        const contentType = proxyRes.headers.get('content-type') || '';
+
+        res.status(proxyRes.status);
+        if (contentType.includes('image')) {
+            res.set('Content-Type', contentType);
+            const buffer = Buffer.from(await proxyRes.arrayBuffer());
+            res.send(buffer);
+        } else {
+            const data = await proxyRes.json();
+            res.json(data);
+        }
+    } catch (err) {
+        res.status(503).json({ error: 'Qwen-Image-Layered 서비스에 연결할 수 없습니다. 모델 로딩 중일 수 있습니다.' });
+    }
+});
+
+// ========================
+// AI 이미지 분석/생성 API (Hugging Face Inference)
+// ========================
+const HF_TOKEN = process.env.HF_TOKEN || '';
+
+// POST /api/ai/analyze-image — BLIP 이미지 캡셔닝
+app.post('/api/ai/analyze-image', async (req, res) => {
+    try {
+        const { image } = req.body; // base64 data URL or URL
+        if (!image) return res.status(400).json({ error: '이미지가 필요합니다.' });
+
+        let imageBuffer;
+        if (image.startsWith('data:')) {
+            // base64 data URL → buffer
+            const base64Data = image.split(',')[1];
+            imageBuffer = Buffer.from(base64Data, 'base64');
+        } else {
+            // URL → fetch → buffer
+            const fetch = (await import('node-fetch')).default;
+            const imgRes = await fetch(image);
+            if (!imgRes.ok) throw new Error('이미지 다운로드 실패');
+            imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+        }
+
+        if (!HF_TOKEN) {
+            // HF 토큰이 없으면 Gemini 3 Flash Vision으로 대체 분석 (시각·공간 추론 강화)
+            const base64 = imageBuffer.toString('base64');
+            const mimeType = 'image/png';
+            try {
+                const result = await visionModel.generateContent([
+                    { inlineData: { mimeType, data: base64 } },
+                    '이 이미지를 디자인 전문가 관점에서 자세히 분석해주세요. 다음 항목을 포함하세요:\n1. 색상 팔레트 (HEX 코드 포함)\n2. 레이아웃 구조 (그리드, 섹션 배치)\n3. 타이포그래피 (폰트 스타일, 크기 비율)\n4. 시각적 스타일 (미니멀, 모던, 대담 등)\n5. 디자인 개선 제안\n한국어로 답변하세요.'
+                ]);
+                return res.json({ caption: result.response.text(), model: 'gemini-3-flash-preview' });
+            } catch (geminiErr) {
+                return res.json({ caption: '⚠️ 이미지 분석 불가 (API 키 설정 필요)', error: true });
+            }
+        }
+
+        // Hugging Face BLIP API 호출
+        const fetch = (await import('node-fetch')).default;
+        const hfRes = await fetch('https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${HF_TOKEN}`,
+                'Content-Type': 'application/octet-stream',
+            },
+            body: imageBuffer,
+        });
+
+        if (!hfRes.ok) {
+            const errText = await hfRes.text();
+            throw new Error(`HF API 오류: ${hfRes.status} - ${errText}`);
+        }
+
+        const data = await hfRes.json();
+        const caption = Array.isArray(data) ? data[0]?.generated_text || '분석 결과 없음' : data.generated_text || '분석 결과 없음';
+
+        res.json({ caption, model: 'blip-image-captioning-large' });
+    } catch (err) {
+        console.error('AI 이미지 분석 오류:', err.message);
+        res.status(500).json({ error: err.message, caption: '⚠️ 이미지 분석 중 오류 발생: ' + err.message });
+    }
+});
+
+// POST /api/ai/generate-image — Nano Banana 2 (gemini-3.1-flash-image-preview) 이미지 생성
+app.post('/api/ai/generate-image', async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: '프롬프트가 필요합니다.' });
+
+        // 1. Nano Banana 2 (gemini-3.1-flash-image-preview) — 최신 이미지 생성 모델
+        const modelsToTry = [IMAGE_GEN_MODEL, IMAGE_GEN_FALLBACK];
+        for (const modelName of modelsToTry) {
+            try {
+                console.log(`🎨 이미지 생성 시도: ${modelName}`);
+                const result = await genAINB.models.generateContent({
+                    model: modelName,
+                    contents: [{
+                        role: 'user',
+                        parts: [{ text: `Generate an image: ${prompt}` }]
+                    }],
+                    config: { responseModalities: ['TEXT', 'IMAGE'] }
+                });
+
+                // 이미지 파트 찾기
+                if (result.candidates && result.candidates[0]) {
+                    const parts = result.candidates[0].content.parts || [];
+                    for (const part of parts) {
+                        if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
+                            const imgBase64 = part.inlineData.data;
+                            const mimeType = part.inlineData.mimeType;
+                            console.log(`✅ 이미지 생성 성공: ${modelName}`);
+                            return res.json({
+                                image: `data:${mimeType};base64,${imgBase64}`,
+                                model: modelName
+                            });
+                        }
+                    }
+                }
+            } catch (genErr) {
+                console.log(`⚠️ ${modelName} 실패:`, genErr.message);
+            }
+        }
+
+        // 2. Hugging Face Stable Diffusion XL 대체
+        if (HF_TOKEN) {
+            const fetch = (await import('node-fetch')).default;
+            const hfRes = await fetch('https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${HF_TOKEN}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ inputs: prompt }),
+            });
+
+            if (!hfRes.ok) {
+                const errText = await hfRes.text();
+                throw new Error(`HF API 오류: ${hfRes.status} - ${errText}`);
+            }
+
+            const buffer = Buffer.from(await hfRes.arrayBuffer());
+            const base64 = buffer.toString('base64');
+            return res.json({
+                image: `data:image/png;base64,${base64}`,
+                model: 'stable-diffusion-xl-base-1.0'
+            });
+        }
+
+        res.status(400).json({ error: 'AI 이미지 생성을 위해 HF_TOKEN 환경변수를 설정하세요.', message: '⚠️ HF_TOKEN 미설정' });
+    } catch (err) {
+        console.error('AI 이미지 생성 오류:', err.message);
+        res.status(500).json({ error: err.message, message: '⚠️ 이미지 생성 중 오류 발생: ' + err.message });
+    }
+});
+
+// ========================
+// 디자인 스튜디오 API
+// ========================
+
+// 파일 업로드용 multer 설정 (디자인)
+const designUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+
+// POST /api/design/analyze — 이미지 분석 (톤앤매너 추출)
+app.post('/api/design/analyze', designUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: '파일이 필요합니다.' });
+
+        const base64 = req.file.buffer.toString('base64');
+        const mimeType = req.file.mimetype || 'image/png';
+
+        const result = await visionModel.generateContent([
+            { inlineData: { mimeType, data: base64 } },
+            `이 이미지의 디자인 톤앤매너를 분석해주세요. 반드시 다음 JSON 형식으로만 응답하세요:
+{
+  "colors": [{"hex": "#XXXXXX", "name": "색상명"}],
+  "fonts": [{"name": "폰트명", "usage": "용도", "weight": "굵기"}],
+  "styles": ["스타일키워드1", "스타일키워드2"],
+  "scores": {"색상조화": 0.85, "레이아웃": 0.9, "가독성": 0.8, "전문성": 0.88}
+}
+JSON만 반환하세요.`
+        ]);
+
+        const text = result.response.text();
+        let parsed;
+        try {
+            // JSON 블록 추출
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { colors: [], fonts: [], styles: ['분석됨'] };
+        } catch {
+            parsed = { colors: [], fonts: [], styles: ['분석됨'], rawText: text };
+        }
+
+        res.json(parsed);
+    } catch (err) {
+        console.error('디자인 분석 오류:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/design/modify — 이미지 부분 수정 (원본 이미지 + 명령 → 수정된 이미지)
+app.post('/api/design/modify', async (req, res) => {
+    try {
+        const { message, analysis, imageUrl, attachmentDataUrl, sessionId } = req.body;
+        if (!message && !imageUrl && !attachmentDataUrl) {
+            return res.status(400).json({ error: '메시지 또는 이미지가 필요합니다.' });
+        }
+
+        // 이미지 데이터 추출
+        let imageBase64 = null;
+        let imageMime = 'image/png';
+
+        if (attachmentDataUrl && attachmentDataUrl.startsWith('data:')) {
+            const [header, data] = attachmentDataUrl.split(',');
+            const mimeMatch = header.match(/data:([^;]+)/);
+            imageMime = mimeMatch ? mimeMatch[1] : 'image/png';
+            imageBase64 = data;
+        } else if (imageUrl) {
+            try {
+                const fetch = (await import('node-fetch')).default;
+                const imgRes = await fetch(imageUrl);
+                if (imgRes.ok) {
+                    const buffer = Buffer.from(await imgRes.arrayBuffer());
+                    imageBase64 = buffer.toString('base64');
+                }
+            } catch (fetchErr) {
+                console.log('이미지 다운로드 실패:', fetchErr.message);
+            }
+        }
+
+        // 톤앤매너 컨텍스트 구성
+        let contextText = '';
+        if (analysis) {
+            if (analysis.colors) contextText += `기존 색상: ${analysis.colors.map(c => c.hex).join(', ')}. `;
+            if (analysis.fonts) contextText += `기존 폰트: ${analysis.fonts.map(f => f.name).join(', ')}. `;
+            if (analysis.styles) contextText += `기존 스타일: ${analysis.styles.join(', ')}. `;
+        }
+
+        let responseText = '';
+        let generatedImage = null;
+
+        // === 이미지가 첨부된 경우: Nano Banana 2/Pro로 이미지 편집 ===
+        if (imageBase64) {
+            const editPrompt = `${contextText ? '[톤앤매너 유지] ' + contextText : ''}이 이미지를 다음과 같이 수정해주세요: ${message}. 원본 이미지의 스타일과 톤앤매너를 최대한 유지하면서 요청한 부분만 변경하세요. 수정된 이미지를 생성해주세요.`;
+
+            // 1차 시도: Nano Banana 2 (gemini-3.1-flash-image-preview)
+            try {
+                console.log('🖼️ Nano Banana 2로 이미지 편집 시도...');
+                const editResult = await genAINB.models.generateContent({
+                    model: IMAGE_GEN_MODEL,
+                    contents: [{
+                        role: 'user',
+                        parts: [
+                            { inlineData: { mimeType: imageMime, data: imageBase64 } },
+                            { text: editPrompt }
+                        ]
+                    }],
+                    config: { responseModalities: ['TEXT', 'IMAGE'] }
+                });
+
+                if (editResult.candidates && editResult.candidates[0]) {
+                    const editParts = editResult.candidates[0].content.parts || [];
+                    for (const part of editParts) {
+                        if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
+                            generatedImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                            console.log('✅ Nano Banana 2 이미지 편집 성공');
+                        }
+                        if (part.text) {
+                            responseText += part.text;
+                        }
+                    }
+                }
+            } catch (nb2Err) {
+                console.log('⚠️ Nano Banana 2 편집 실패:', nb2Err.message);
+            }
+
+            // 2차 시도: Nano Banana Pro (fallback)
+            if (!generatedImage) {
+                try {
+                    console.log('🖼️ Nano Banana Pro로 이미지 편집 재시도...');
+                    const editResult2 = await genAINB.models.generateContent({
+                        model: IMAGE_GEN_FALLBACK,
+                        contents: [{
+                            role: 'user',
+                            parts: [
+                                { inlineData: { mimeType: imageMime, data: imageBase64 } },
+                                { text: editPrompt }
+                            ]
+                        }],
+                        config: { responseModalities: ['TEXT', 'IMAGE'] }
+                    });
+
+                    if (editResult2.candidates && editResult2.candidates[0]) {
+                        const editParts2 = editResult2.candidates[0].content.parts || [];
+                        for (const part of editParts2) {
+                            if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
+                                generatedImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                                console.log('✅ Nano Banana Pro 이미지 편집 성공');
+                            }
+                            if (part.text) responseText += part.text;
+                        }
+                    }
+                } catch (nbpErr) {
+                    console.log('⚠️ Nano Banana Pro 편집 실패:', nbpErr.message);
+                }
+            }
+
+            // 3차 시도: Vision 모델로 분석만 제공 (이미지 편집 불가 시)
+            if (!generatedImage && !responseText) {
+                try {
+                    const analysisResult = await visionModel.generateContent([
+                        { inlineData: { mimeType: imageMime, data: imageBase64 } },
+                        { text: `사용자가 이 이미지에 대해 다음 수정을 요청했습니다: "${message}"\n\n1. 이 이미지의 현재 상태를 분석해주세요.\n2. 요청된 수정 사항을 어떻게 적용하면 좋을지 구체적으로 안내해주세요.\n한국어로 답변하세요.` }
+                    ]);
+                    responseText = analysisResult.response.text();
+                } catch (visionErr) {
+                    responseText = '이미지 분석에 실패했습니다. 다시 시도해주세요.';
+                }
+            }
+
+            if (!responseText) responseText = generatedImage ? '✅ 이미지가 수정되었습니다. 아래에서 다운로드하세요.' : '이미지 수정을 시도했으나 처리할 수 없었습니다.';
+
+        } else {
+            // === 이미지 없이 텍스트만: Vision 모델로 답변 ===
+            try {
+                const textResult = await visionModel.generateContent([
+                    { text: `당신은 인팸 디자인 AI입니다. ${contextText}\n\n사용자 요청: ${message}\n\n디자인 전문가 관점에서 구체적으로 답변하세요. 한국어로 답변하세요.` }
+                ]);
+                responseText = textResult.response.text();
+            } catch (textErr) {
+                responseText = '⚠️ 처리 중 오류: ' + textErr.message;
+            }
+        }
+
+        res.json({ response: responseText, generatedImage, analysis });
+
+    } catch (err) {
+        console.error('디자인 수정 오류:', err.message);
+        res.status(500).json({ error: err.message, response: '⚠️ 처리 중 오류: ' + err.message });
+    }
+});
+
+// POST /api/design/extract-images — URL에서 이미지 추출
+app.post('/api/design/extract-images', async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL이 필요합니다.' });
+
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const images = [];
+        const seen = new Set();
+
+        $('img').each((i, el) => {
+            let src = $(el).attr('src') || $(el).attr('data-src') || '';
+            if (!src || src.startsWith('data:')) return;
+            if (!src.startsWith('http')) {
+                try { src = new URL(src, url).href; } catch { return; }
+            }
+            if (seen.has(src)) return;
+            seen.add(src);
+            images.push({ url: src, alt: $(el).attr('alt') || '' });
+        });
+
+        res.json({ images: images.slice(0, 50) });
+    } catch (err) {
+        console.error('이미지 추출 오류:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(PORT, async () => {
     const faqCount = loadFAQData().length;
     const learnCount = loadLearnedData().length;
@@ -1065,5 +2269,13 @@ app.listen(PORT, async () => {
         console.log(`✅ RAG 준비 완료: ${ragResult.totalDocuments}개 문서 인덱싱 (${ragResult.buildTime})`);
     } else {
         console.log(`⚠️ RAG 빌드 스킵: ${ragResult.reason}`);
+    }
+
+    // 로컬 환경에서만 자식 서비스 실행 (클라우드에는 Python 서비스 없음)
+    if (!process.env.RENDER) {
+        startContentDashboard();
+        startLayeredService();
+    } else {
+        console.log('☁️ 클라우드 환경 — 자식 서비스(콘텐츠 대시보드/Qwen) 스킵');
     }
 });

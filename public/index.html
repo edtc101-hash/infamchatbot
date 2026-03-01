@@ -18,15 +18,229 @@
   <meta name="apple-mobile-web-app-title" content="인팸 챗봇">
   <link rel="apple-touch-icon" href="/infam-logo.svg">
   <link rel="stylesheet" href="style.css">
-  <script>
-    // Service Worker 등록
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('✅ SW 등록:', reg.scope))
-          .catch(err => console.log('SW 등록 실패:', err));
-      });
+  <style>
+    /* 콘텐츠 뷰 전환 */
+    .chat-main {
+      transition: opacity 0.2s ease;
     }
+
+    .chat-main.view-hidden {
+      display: none !important;
+    }
+
+    .content-view {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .content-view.view-active {
+      display: flex;
+    }
+
+    .content-view-header {
+      height: var(--header-h);
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 24px;
+      flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .content-view-header .cv-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+      flex-shrink: 0;
+    }
+
+    .content-view-header .cv-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .content-view-header .cv-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .content-view-header .cv-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .cv-badge {
+      padding: 5px 12px;
+      background: rgba(124, 58, 237, 0.1);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #a855f7;
+    }
+
+    .cv-external-btn {
+      background: var(--white);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 500;
+      padding: 6px 12px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .cv-external-btn:hover {
+      background: rgba(124, 58, 237, 0.06);
+      border-color: rgba(124, 58, 237, 0.3);
+      color: #7c3aed;
+    }
+
+    .content-iframe-wrap {
+      flex: 1;
+      position: relative;
+      background: #f8fafc;
+    }
+
+    .content-iframe-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .cv-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--white);
+      gap: 14px;
+      z-index: 5;
+    }
+
+    .cv-loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .cv-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(124, 58, 237, 0.15);
+      border-top-color: #a855f7;
+      border-radius: 50%;
+      animation: cvspin 0.8s linear infinite;
+    }
+
+    @keyframes cvspin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .cv-error {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--white);
+      gap: 14px;
+      z-index: 5;
+    }
+
+    .cv-error.show {
+      display: flex;
+    }
+
+    .cv-error h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .cv-error p {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .cv-error .cv-cmd {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--gray-50);
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-family: 'Consolas', monospace;
+    }
+
+    .cv-retry-btn {
+      padding: 10px 22px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+    }
+
+    .cv-retry-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
+    }
+  </style>
+  <script>
+    // Service Worker 완전 제거 + 캐시 정리 (오프라인 오류 근본 차단)
+    (async function cleanupSW() {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const reg of registrations) {
+            await reg.unregister();
+            console.log('🧹 SW 해제 완료:', reg.scope);
+          }
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          for (const key of keys) {
+            await caches.delete(key);
+          }
+          if (keys.length > 0) console.log('🧹 캐시 삭제 완료:', keys);
+        }
+        // manifest 태그 제거 (PWA 재등록 방지)
+        const manifestLink = document.querySelector('link[rel="manifest"]');
+        if (manifestLink) manifestLink.remove();
+      } catch (e) {
+        console.warn('SW 정리 중 오류:', e);
+      }
+    })();
   </script>
 </head>
 
@@ -55,20 +269,33 @@
       </div>
 
       <div class="sidebar-nav">
-        <a href="/" class="nav-item active">
+        <a href="javascript:void(0)" class="nav-item active" id="navChat" onclick="switchView('chat')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path>
           </svg>
           <span>챗봇</span>
         </a>
-        <a href="/learn.html" class="nav-item">
+        <a href="javascript:void(0)" class="nav-item" id="navLearn" onclick="switchView('learn')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"></path>
             <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"></path>
           </svg>
           <span>학습 모드</span>
         </a>
-        <a href="/admin.html" class="nav-item">
+        <a href="javascript:void(0)" class="nav-item" id="navUpload" onclick="switchView('upload')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"></path>
+          </svg>
+          <span>텍스트 업로드</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" id="navContent" onclick="switchView('content')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 7l-7 5 7 5V7z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <span>콘텐츠 자동화</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" id="navAdmin" onclick="switchView('admin')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path
               d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z">
@@ -76,6 +303,18 @@
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
           <span>FAQ 관리</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <h3 class="section-label">🎨 인팸 디자인 AI</h3>
+        <a href="javascript:void(0)" class="nav-item" id="navDesign" onclick="switchView('design')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+          </svg>
+          <span>이미지 제작소</span>
         </a>
       </div>
 
@@ -127,6 +366,15 @@
           </a>
           <a href="https://www.instagram.com/interior__family/" target="_blank" class="link-btn">
             <span>📸</span> 인스타그램
+          </a>
+          <a href="https://login.ecount.com/Login/" target="_blank" class="link-btn">
+            <span>📊</span> 이카운트ERP
+          </a>
+          <a href="https://www.instagram.com/interior_grandpa/" target="_blank" class="link-btn">
+            <span>🏗️</span> 시공사례
+          </a>
+          <a href="/company.html" class="link-btn">
+            <span>🏢</span> 회사소개
           </a>
         </div>
       </div>
@@ -260,9 +508,187 @@
         </div>
       </div>
     </main>
+
+    <!-- 인라인 뷰들 (같은 메인 영역에서 iframe으로 로드) -->
+
+    <!-- 학습 모드 뷰 -->
+    <div class="content-view" id="learnView">
+      <header class="content-view-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="cv-icon" style="background:linear-gradient(135deg,#059669,#34d399)">📖</div>
+        <div>
+          <div class="cv-title">학습 모드</div>
+          <div class="cv-sub">대화 기반 AI 학습</div>
+        </div>
+        <div class="cv-actions">
+          <button class="cv-external-btn" onclick="window.open('/learn.html','_blank')" title="새 창에서 열기">↗ 새 창</button>
+        </div>
+      </header>
+      <div class="content-iframe-wrap">
+        <iframe id="learnFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+      </div>
+    </div>
+
+
+
+    <!-- 텍스트 업로드 뷰 -->
+    <div class="content-view" id="uploadView">
+      <header class="content-view-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="cv-icon" style="background:linear-gradient(135deg,#2563eb,#60a5fa)">📤</div>
+        <div>
+          <div class="cv-title">텍스트 업로드</div>
+          <div class="cv-sub">파일 기반 지식 업로드</div>
+        </div>
+        <div class="cv-actions">
+          <button class="cv-external-btn" onclick="window.open('/upload.html','_blank')" title="새 창에서 열기">↗ 새 창</button>
+        </div>
+      </header>
+      <div class="content-iframe-wrap">
+        <iframe id="uploadFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+      </div>
+    </div>
+
+    <!-- 콘텐츠 자동화 뷰 -->
+    <div class="content-view" id="contentView">
+      <header class="content-view-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="cv-icon">🎬</div>
+        <div>
+          <div class="cv-title">콘텐츠 자동화 대시보드</div>
+          <div class="cv-sub">숏폼 영상 기획 → 제작 자동화</div>
+        </div>
+        <div class="cv-actions">
+          <span class="cv-badge">🎥 InFam Studio</span>
+          <button class="cv-external-btn" onclick="window.open('http://localhost:8000','_blank')" title="새 창에서 열기">↗ 새
+            창</button>
+        </div>
+      </header>
+      <div class="content-iframe-wrap">
+        <div class="cv-loading" id="cvLoading">
+          <div class="cv-spinner"></div>
+          <p style="font-size:13px;color:var(--text-muted)">대시보드 연결 중...</p>
+        </div>
+        <div class="cv-error" id="cvError">
+          <div style="font-size:44px;opacity:0.5">🔌</div>
+          <h3>서버에 연결할 수 없습니다</h3>
+          <p>콘텐츠 자동화 백엔드 서버가 실행 중인지 확인해주세요.</p>
+          <div class="cv-cmd">cd 콘텐츠 자동화 대시보드\backend<br>uvicorn main:app --reload --port 8000</div>
+          <button class="cv-retry-btn" onclick="loadContentDashboard()">🔄 다시 연결</button>
+        </div>
+        <iframe id="contentFrame" src="" style="display:none;"></iframe>
+      </div>
+    </div>
+
+    <!-- FAQ 관리 뷰 -->
+    <div class="content-view" id="adminView">
+      <header class="content-view-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="cv-icon" style="background:linear-gradient(135deg,#d97706,#fbbf24)">⚙️</div>
+        <div>
+          <div class="cv-title">FAQ 관리</div>
+          <div class="cv-sub">FAQ 데이터 추가·수정·삭제</div>
+        </div>
+        <div class="cv-actions">
+          <button class="cv-external-btn" onclick="window.open('/admin.html','_blank')" title="새 창에서 열기">↗ 새 창</button>
+        </div>
+      </header>
+      <div class="content-iframe-wrap">
+        <iframe id="adminFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+      </div>
+    </div>
+
+    <!-- 이미지 제작소 뷰 -->
+    <div class="content-view" id="designView">
+      <header class="content-view-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="cv-icon" style="background:linear-gradient(135deg,#7c3aed,#ec4899)">🎨</div>
+        <div>
+          <div class="cv-title">이미지 제작소</div>
+          <div class="cv-sub">톤앤매너 학습 → 디자인 수정·생성</div>
+        </div>
+        <div class="cv-actions">
+          <button class="cv-external-btn" onclick="window.open('/design-studio.html','_blank')" title="새 창에서 열기">↗ 새
+            창</button>
+        </div>
+      </header>
+      <div class="content-iframe-wrap">
+        <iframe id="designFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+      </div>
+    </div>
   </div>
 
   <script src="chatbot.js"></script>
+  <script>
+    // === 뷰 전환 (챗봇 ↔ 학습 ↔ 업로드 ↔ 콘텐츠 ↔ FAQ관리) ===
+    const viewConfig = {
+      chat: { viewId: null, navId: 'navChat', frameId: null, src: null },
+      learn: { viewId: 'learnView', navId: 'navLearn', frameId: 'learnFrame', src: '/learn.html' },
+      upload: { viewId: 'uploadView', navId: 'navUpload', frameId: 'uploadFrame', src: '/upload.html' },
+      content: { viewId: 'contentView', navId: 'navContent', frameId: 'contentFrame', src: null },
+      admin: { viewId: 'adminView', navId: 'navAdmin', frameId: 'adminFrame', src: '/admin.html' },
+      design: { viewId: 'designView', navId: 'navDesign', frameId: 'designFrame', src: '/design-studio.html' },
+    };
+    let contentLoaded = false;
+    const loadedFrames = new Set();
+
+    function switchView(view) {
+      const chatMain = document.querySelector('.chat-main');
+
+      // 모든 뷰 숨기기
+      document.querySelectorAll('.content-view').forEach(v => v.classList.remove('view-active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+      if (view === 'chat') {
+        chatMain.classList.remove('view-hidden');
+        document.getElementById('navChat').classList.add('active');
+      } else {
+        chatMain.classList.add('view-hidden');
+        const cfg = viewConfig[view];
+        if (!cfg) return;
+
+        // 뷰 표시
+        if (cfg.viewId) document.getElementById(cfg.viewId).classList.add('view-active');
+        if (cfg.navId) document.getElementById(cfg.navId).classList.add('active');
+
+        // 콘텐츠 자동화는 특별 처리 (외부 서버)
+        if (view === 'content') {
+          if (!contentLoaded) loadContentDashboard();
+        } else if (cfg.src && cfg.frameId && !loadedFrames.has(view)) {
+          // 첫 로드 시에만 iframe src 설정
+          document.getElementById(cfg.frameId).src = cfg.src;
+          loadedFrames.add(view);
+        }
+      }
+      // 모바일 사이드바 닫기
+      if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+    }
+
+    function loadContentDashboard() {
+      const loading = document.getElementById('cvLoading');
+      const error = document.getElementById('cvError');
+      const frame = document.getElementById('contentFrame');
+
+      loading.classList.remove('hidden');
+      error.classList.remove('show');
+      frame.style.display = 'none';
+
+      fetch('http://localhost:8000/', { mode: 'no-cors' })
+        .then(() => {
+          frame.src = 'http://localhost:8000/';
+          frame.style.display = 'block';
+          frame.onload = () => {
+            loading.classList.add('hidden');
+            contentLoaded = true;
+          };
+          setTimeout(() => { loading.classList.add('hidden'); }, 10000);
+        })
+        .catch(() => {
+          loading.classList.add('hidden');
+          error.classList.add('show');
+        });
+    }
+  </script>
 </body>
 
 </html>

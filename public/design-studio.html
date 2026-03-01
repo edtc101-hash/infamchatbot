@@ -1,0 +1,2358 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이미지 제작소 | 인팸 디자인 AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.min.mjs" type="module"></script>
+    <style>
+        :root {
+            --primary: #7c3aed;
+            --primary-light: #a855f7;
+            --primary-bg: rgba(124, 58, 237, 0.06);
+            --accent: #f59e0b;
+            --accent-bg: rgba(245, 158, 11, 0.08);
+            --success: #10b981;
+            --bg: #f8fafc;
+            --white: #ffffff;
+            --text: #1e293b;
+            --text-sub: #64748b;
+            --text-muted: #94a3b8;
+            --border: #e2e8f0;
+            --radius: 14px;
+            --radius-sm: 8px;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .studio-layout {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 0;
+            height: 100vh;
+        }
+
+        /* 헤더 */
+        .studio-header {
+            grid-column: 1 / -1;
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: var(--shadow);
+        }
+
+        .studio-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #7c3aed, #ec4899);
+            border-radius: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
+        }
+
+        .studio-header h1 {
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .studio-header .studio-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .header-actions {
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .studio-badge {
+            padding: 5px 14px;
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(236, 72, 153, 0.1));
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* 좌측 패널 */
+        .panel-left {
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background: var(--white);
+        }
+
+        .panel-title {
+            padding: 16px 20px 12px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        /* 업로드 영역 */
+        .upload-zone {
+            margin: 16px;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 28px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--bg);
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-over {
+            border-color: var(--primary);
+            background: var(--primary-bg);
+        }
+
+        .upload-zone .upload-icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+
+        .upload-zone h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .upload-zone p {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .upload-zone .file-types {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .upload-zone .file-types span {
+            padding: 2px 8px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--text-sub);
+        }
+
+        .upload-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* 업로드 미리보기 */
+        .uploaded-preview {
+            display: none;
+            margin: 0 16px 12px;
+            padding: 12px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .uploaded-preview.show {
+            display: flex;
+        }
+
+        .uploaded-preview img {
+            width: 56px;
+            height: 56px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid var(--border);
+        }
+
+        .uploaded-preview .file-info {
+            flex: 1;
+        }
+
+        .uploaded-preview .file-name {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .uploaded-preview .file-size {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .uploaded-preview .remove-btn {
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .uploaded-preview .remove-btn:hover {
+            color: #ef4444;
+        }
+
+        /* 분석 중 */
+        .analysis-loading {
+            display: none;
+            margin: 0 16px 12px;
+            padding: 24px;
+            text-align: center;
+            background: var(--primary-bg);
+            border-radius: var(--radius);
+            border: 1px solid rgba(124, 58, 237, 0.15);
+            flex-shrink: 0;
+        }
+
+        .analysis-loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid rgba(124, 58, 237, 0.15);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .analysis-loading p {
+            font-size: 12px;
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        /* 분석 결과 */
+        .analysis-result {
+            display: none;
+            padding: 0 16px 12px;
+            flex-shrink: 0;
+        }
+
+        .analysis-result.show {
+            display: block;
+        }
+
+        .result-section {
+            margin-bottom: 14px;
+        }
+
+        .result-section h4 {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .color-chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .color-chip {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .color-chip .swatch {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .color-chip .label {
+            font-size: 8px;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-family: 'Consolas', monospace;
+        }
+
+        .font-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .font-item {
+            padding: 8px 12px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+
+        .font-item .font-name {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .font-item .font-detail {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .style-tags {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .style-tag {
+            padding: 4px 10px;
+            background: var(--accent-bg);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 14px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #d97706;
+        }
+
+        /* === URL 이미지 추출 === */
+        .url-section {
+            margin: 0 16px 12px;
+            flex-shrink: 0;
+        }
+
+        .url-section h4 {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .url-input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .url-input-row input {
+            flex: 1;
+            padding: 9px 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .url-input-row input:focus {
+            border-color: var(--primary);
+        }
+
+        .url-input-row button {
+            padding: 9px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .url-input-row button:hover {
+            background: #6d28d9;
+        }
+
+        .url-input-row button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 이미지 갤러리 */
+        .image-gallery {
+            display: none;
+            margin: 12px 16px;
+            flex-shrink: 0;
+        }
+
+        .image-gallery.show {
+            display: block;
+        }
+
+        .image-gallery h4 {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .image-gallery h4 .count {
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .gallery-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .gallery-item:hover {
+            border-color: var(--primary);
+            transform: scale(1.03);
+        }
+
+        .gallery-item.selected {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-item .send-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(124, 58, 237, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .gallery-item:hover .send-overlay {
+            opacity: 1;
+        }
+
+        .gallery-item .send-overlay span {
+            font-size: 18px;
+        }
+
+        .gallery-loading {
+            display: none;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .gallery-loading.show {
+            display: block;
+        }
+
+        /* 레이어 분해 */
+        .layer-section {
+            margin: 12px 16px;
+            flex-shrink: 0;
+            display: none;
+        }
+
+        .layer-section.show {
+            display: block;
+        }
+
+        .layer-section h4 {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .decompose-btn {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .decompose-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .decompose-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .layer-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .layer-card {
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: repeating-conic-gradient(#e2e8f0 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+            position: relative;
+        }
+
+        .layer-card:hover {
+            border-color: #059669;
+            transform: scale(1.02);
+        }
+
+        .layer-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .layer-card .layer-label {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            padding: 2px 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 6px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .layer-status {
+            font-size: 11px;
+            color: var(--text-muted);
+            padding: 4px 10px;
+            background: var(--bg);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .layer-status .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .layer-status .dot.green {
+            background: #10b981;
+        }
+
+        .layer-status .dot.yellow {
+            background: #f59e0b;
+            animation: pulse 1s infinite;
+        }
+
+        .layer-status .dot.red {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.4
+            }
+        }
+
+        /* === 우측: 채팅 === */
+        .panel-right {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .chat-msg {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 16px;
+            font-size: 13px;
+            line-height: 1.65;
+            animation: msgIn 0.3s ease;
+        }
+
+        @keyframes msgIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-msg.bot {
+            align-self: flex-start;
+            background: var(--white);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .chat-msg.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            color: var(--white);
+        }
+
+        .chat-msg .msg-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            opacity: 0.6;
+        }
+
+        .chat-msg.bot .msg-label {
+            color: var(--primary);
+        }
+
+        .chat-msg img.msg-image {
+            max-width: 100%;
+            border-radius: 10px;
+            margin: 8px 0;
+            border: 1px solid var(--border);
+        }
+
+        /* === Interactive Chat UI Components === */
+        .msg-section {
+            margin: 10px 0;
+            padding: 10px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .msg-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .msg-chart-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+            font-size: 11px;
+        }
+
+        .msg-chart-bar .bar-label {
+            width: 60px;
+            flex-shrink: 0;
+            font-weight: 500;
+            color: var(--text-sub);
+        }
+
+        .msg-chart-bar .bar-track {
+            flex: 1;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .msg-chart-bar .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .msg-chart-bar .bar-value {
+            width: 36px;
+            text-align: right;
+            font-weight: 600;
+            font-size: 10px;
+            color: var(--text);
+        }
+
+        /* Action Buttons */
+        .msg-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .msg-action-btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--white);
+            color: var(--text);
+            font-family: inherit;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .msg-action-btn:hover {
+            border-color: var(--primary);
+            background: var(--primary-bg);
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .msg-action-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .msg-action-btn--primary {
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            color: white;
+            border: none;
+        }
+
+        .msg-action-btn--primary:hover {
+            background: linear-gradient(135deg, #6d28d9, #9333ea);
+            color: white;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        /* Color Chips (interactive) */
+        .msg-color-row {
+            display: flex;
+            gap: 8px;
+            margin: 6px 0;
+            flex-wrap: wrap;
+        }
+
+        .msg-color-chip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px 4px 4px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .msg-color-chip:hover {
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .msg-color-chip .chip-swatch {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        /* Editable inline tag */
+        .msg-editable-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-radius: 14px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #d97706;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .msg-editable-tag:hover {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: #f59e0b;
+        }
+
+        .msg-editable-tag .edit-icon {
+            font-size: 10px;
+            opacity: 0.6;
+        }
+
+        /* Font/Style List */
+        .msg-prop-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin: 6px 0;
+        }
+
+        .msg-prop-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .msg-prop-item:hover {
+            border-color: var(--primary);
+            background: var(--primary-bg);
+        }
+
+        .msg-prop-item .prop-label {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .msg-prop-item .prop-value {
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        .msg-prop-item .prop-edit {
+            color: var(--primary);
+            font-size: 10px;
+            font-weight: 700;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .msg-prop-item:hover .prop-edit {
+            opacity: 1;
+        }
+
+        .chat-msg .generated-image {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 10px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* === Capture Popup === */
+        .capture-popup-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .capture-popup {
+            background: var(--white);
+            border-radius: 18px;
+            width: 95vw;
+            max-width: 1100px;
+            max-height: 95vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+
+        .capture-popup__header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .capture-popup__title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .capture-popup__subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .capture-popup__close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: var(--bg);
+            font-size: 16px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+
+        .capture-popup__close:hover {
+            background: #fef2f2;
+            color: #ef4444;
+        }
+
+        .capture-popup__canvas {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            cursor: crosshair;
+            min-height: 400px;
+            max-height: 65vh;
+            background: repeating-conic-gradient(#f1f5f9 0% 25%, #fff 0% 50%) 0 0 / 20px 20px;
+        }
+
+        .capture-popup__canvas img {
+            display: block;
+            transform-origin: 0 0;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .capture-popup__selection {
+            position: absolute;
+            border: 2px dashed #7c3aed;
+            background: rgba(124, 58, 237, 0.1);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .capture-popup__zoom-bar {
+            display: flex;
+            gap: 8px;
+            padding: 10px 24px;
+            border-top: 1px solid var(--border);
+            align-items: center;
+            background: var(--bg);
+        }
+
+        .capture-popup__zoom-bar button {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--white);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .capture-popup__zoom-bar button:hover {
+            border-color: var(--primary);
+            background: var(--primary-bg);
+        }
+
+        .capture-popup__zoom-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary);
+            min-width: 40px;
+            text-align: center;
+        }
+
+        /* === Command Dialog === */
+        .command-dialog {
+            padding: 18px 24px;
+            border-top: 1px solid var(--border);
+            background: var(--white);
+        }
+
+        .command-dialog__label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .command-dialog__input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .command-dialog__input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+            min-height: 48px;
+        }
+
+        .command-dialog__input:focus {
+            border-color: var(--primary);
+        }
+
+        .command-dialog__generate-btn {
+            padding: 10px 24px;
+            background: linear-gradient(135deg, #7c3aed, #ec4899);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .command-dialog__generate-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+        }
+
+        .command-dialog__generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .command-dialog__quick-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-cmd-btn {
+            padding: 5px 12px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--white);
+            color: var(--text-sub);
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .quick-cmd-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-bg);
+        }
+
+        /* 첨부 미리보기 */
+        .chat-attachment-preview {
+            display: none;
+            padding: 10px 20px 0;
+            background: var(--white);
+        }
+
+        .chat-attachment-preview.show {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chat-attachment-preview img {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid var(--border);
+        }
+
+        .chat-attachment-preview .att-info {
+            flex: 1;
+            font-size: 11px;
+            color: var(--text-sub);
+        }
+
+        .chat-attachment-preview .att-remove {
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        /* 입력 */
+        .chat-input-area {
+            padding: 14px 20px;
+            background: var(--white);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .attach-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .attach-btn:hover {
+            background: var(--primary-bg);
+            border-color: var(--primary);
+        }
+
+        .attach-btn input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .chat-input-area textarea {
+            flex: 1;
+            padding: 9px 14px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 13px;
+            font-family: inherit;
+            resize: none;
+            min-height: 38px;
+            max-height: 100px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input-area textarea:focus {
+            border-color: var(--primary);
+        }
+
+        .send-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #7c3aed, #ec4899);
+            border: none;
+            color: white;
+            font-size: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        .send-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            transform: none;
+            cursor: not-allowed;
+        }
+
+        /* 초기 상태 */
+        .welcome-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .welcome-state .icon {
+            font-size: 52px;
+            opacity: 0.4;
+        }
+
+        .welcome-state h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-sub);
+        }
+
+        .welcome-state p {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .studio-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto 1fr;
+            }
+
+            .panel-left {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                max-height: 45vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="studio-layout">
+        <header class="studio-header">
+            <div class="studio-logo">🎨</div>
+            <div>
+                <h1>이미지 제작소</h1>
+                <div class="studio-sub">톤앤매너 학습 · 이미지 생성 · 디자인 수정</div>
+            </div>
+            <div class="header-actions">
+                <span class="studio-badge">🍌 Nano Banana 2 + Gemini 3 Flash</span>
+            </div>
+        </header>
+
+        <!-- 좌측: 업로드 + URL + 갤러리 + 분석 -->
+        <div class="panel-left">
+            <div class="panel-title">📤 레퍼런스 & 이미지 추출</div>
+
+            <!-- 파일 업로드 -->
+            <div class="upload-zone" id="uploadZone">
+                <input type="file" id="fileInput" accept="image/*,.pdf,.pptx,.xlsx" multiple>
+                <div class="upload-icon">📁</div>
+                <h3>파일을 드래그하거나 클릭하여 업로드</h3>
+                <p>톤앤매너를 학습할 레퍼런스 파일</p>
+                <div class="file-types">
+                    <span>PNG</span><span>JPG</span><span>PDF</span><span>PPTX</span>
+                </div>
+            </div>
+
+            <!-- 메뉴얼 가이드 -->
+            <div
+                style="padding:12px 16px;background:rgba(124,58,237,0.04);border:1px solid rgba(124,58,237,0.12);border-radius:12px;margin:12px 0;">
+                <div
+                    style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;display:flex;align-items:center;gap:5px;">
+                    📋 작업 가이드</div>
+                <div style="font-size:11px;color:var(--text-sub);line-height:1.8;">
+                    <div style="display:flex;gap:6px;align-items:start;"><span
+                            style="background:var(--primary);color:white;border-radius:10px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">1</span>파일을
+                        선택하면 <b>캡쳐화면</b>으로 넘어가, 수정할 영역을 선택할 수 있습니다.</div>
+                    <div style="display:flex;gap:6px;align-items:start;margin-top:4px;"><span
+                            style="background:var(--primary);color:white;border-radius:10px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">2</span>똑같은
+                        이미지의 톤앤매너로 추가하시겠다면, 원하는 이미지를 클릭하여 다음단계에서 명령을 수행하세요.</div>
+                </div>
+            </div>
+
+            <div class="uploaded-preview" id="uploadedPreview">
+                <img id="previewImg" src="" alt="">
+                <div class="file-info">
+                    <div class="file-name" id="fileName">-</div>
+                    <div class="file-size" id="fileSize">-</div>
+                </div>
+                <button class="remove-btn" onclick="removeFile()" title="제거">✕</button>
+            </div>
+
+            <div class="analysis-loading" id="analysisLoading">
+                <div class="spinner"></div>
+                <p>🧠 Gemini Vision으로 톤앤매너 분석 중...</p>
+            </div>
+
+            <div class="analysis-result" id="analysisResult">
+                <div class="result-section">
+                    <h4>🎨 색상 팔레트</h4>
+                    <div class="color-chips" id="colorChips"></div>
+                </div>
+                <div class="result-section">
+                    <h4>🔤 폰트/타이포그래피</h4>
+                    <div class="font-list" id="fontList"></div>
+                </div>
+                <div class="result-section">
+                    <h4>✨ 디자인 스타일</h4>
+                    <div class="style-tags" id="styleTags"></div>
+                </div>
+            </div>
+
+            <!-- URL 이미지 추출 -->
+            <div class="url-section">
+                <h4>🔗 URL에서 이미지 추출</h4>
+                <div class="url-input-row">
+                    <input type="text" id="urlInput" placeholder="https://example.com/page"
+                        onkeydown="if(event.key==='Enter')extractImages()">
+                    <button id="extractBtn" onclick="extractImages()">추출</button>
+                </div>
+            </div>
+
+            <!-- 이미지 갤러리 -->
+            <div class="gallery-loading" id="galleryLoading">
+                <div class="spinner"></div>
+                <p style="font-size:12px;color:var(--text-muted);">이미지 추출 중...</p>
+            </div>
+
+            <div class="image-gallery" id="imageGallery">
+                <h4>
+                    🖼️ 추출된 이미지
+                    <span class="count" id="imageCount">0개</span>
+                </h4>
+                <div class="gallery-grid" id="galleryGrid"></div>
+            </div>
+
+            <!-- 레이어 분해 (Qwen-Image-Layered) -->
+            <div class="layer-section" id="layerSection">
+                <h4>🧩 레이어 분해 (Qwen AI)
+                    <span class="layer-status" id="layerStatus"><span class="dot yellow"></span> 확인 중...</span>
+                </h4>
+                <button class="decompose-btn" id="decomposeBtn" onclick="decomposeImage()" disabled>🧩 이미지 레이어
+                    분해</button>
+                <div class="layer-grid" id="layerGrid"></div>
+            </div>
+        </div>
+
+        <!-- 우측: 채팅 -->
+        <div class="panel-right">
+            <div class="panel-title">💬 디자인 수정 채팅 <span
+                    style="font-weight:400;font-size:11px;color:var(--text-muted);margin-left:auto;">클릭하면 이미지가 채팅에
+                    전송됩니다</span></div>
+
+            <div class="welcome-state" id="welcomeState">
+                <div class="icon">🖌️</div>
+                <h3>디자인 AI와 대화를 시작하세요</h3>
+                <p>레퍼런스 파일을 업로드하거나<br>URL에서 이미지를 추출한 후<br>이미지를 클릭하면 채팅에 전송됩니다.<br><br>수정 지시를 입력하면 AI가 바로 처리합니다.</p>
+            </div>
+
+            <div class="chat-messages" id="chatMessages" style="display:none;"></div>
+
+            <div class="chat-attachment-preview" id="chatAttPreview">
+                <img id="chatAttImg" src="">
+                <div class="att-info" id="chatAttInfo">첨부된 이미지</div>
+                <button class="att-remove" onclick="removeChatAttachment()">✕</button>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="attach-btn" title="이미지 첨부">
+                    📎
+                    <input type="file" id="chatFileInput" accept="image/*,.pdf" onchange="attachChatFile(event)">
+                </div>
+                <textarea id="chatInput" placeholder="수정 지시를 입력하세요... (예: 이 이미지의 배경을 파란색으로 변경)" rows="1"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDesignChat();}"></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendDesignChat()">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let analysisData = null;
+        let chatAttachment = null;
+        let chatAttachmentMime = null;
+        let sessionId = 'design_' + Date.now();
+        let chatActivated = false;
+
+        // === 파일 업로드 ===
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault(); uploadZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+        async function handleFile(file) {
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatSize(file.size);
+            const preview = document.getElementById('uploadedPreview');
+            const previewImg = document.getElementById('previewImg');
+
+            if (file.type.startsWith('image/')) {
+                previewImg.src = URL.createObjectURL(file);
+                preview.classList.add('show');
+                uploadZone.style.display = 'none';
+                const reader = new FileReader();
+                reader.onload = (e) => openCapturePopup(e.target.result);
+                reader.readAsDataURL(file);
+            } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                // PDF → 이미지 변환
+                previewImg.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="%23ef4444"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6" fill="none" stroke="%23ef4444" stroke-width="1.5"/><text x="7" y="17" font-size="6" fill="white" font-weight="bold">PDF</text></svg>';
+                preview.classList.add('show');
+                uploadZone.style.display = 'none';
+                await convertPdfToImages(file);
+            } else {
+                previewImg.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg>';
+                preview.classList.add('show');
+                uploadZone.style.display = 'none';
+                await analyzeFile(file);
+            }
+        }
+
+        // PDF → 이미지 변환 (PDF.js)
+        async function convertPdfToImages(file) {
+            const loading = document.getElementById('analysisLoading');
+            loading.querySelector('p').textContent = '📄 PDF를 이미지로 변환 중...';
+            loading.classList.add('show');
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.min.mjs');
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.worker.min.mjs';
+
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const totalPages = pdf.numPages;
+                const pageImages = [];
+
+                // 모든 페이지를 이미지로 변환 (고해상도 스케일 2x)
+                for (let i = 1; i <= totalPages; i++) {
+                    loading.querySelector('p').textContent = `📄 PDF 변환 중... (${i}/${totalPages} 페이지)`;
+                    const page = await pdf.getPage(i);
+                    const scale = 2;
+                    const viewport = page.getViewport({ scale });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const ctx = canvas.getContext('2d');
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    pageImages.push({
+                        dataUrl: canvas.toDataURL('image/png'),
+                        width: viewport.width,
+                        height: viewport.height,
+                        pageNum: i
+                    });
+                }
+
+                loading.classList.remove('show');
+                loading.querySelector('p').textContent = '🧠 Gemini Vision으로 톤앤매너 분석 중...';
+
+                if (pageImages.length === 0) {
+                    addBotMessage('⚠️ PDF에서 이미지를 추출할 수 없습니다.');
+                    return;
+                }
+
+                // 미리보기 이미지 업데이트
+                document.getElementById('previewImg').src = pageImages[0].dataUrl;
+
+                if (pageImages.length === 1) {
+                    // 1페이지면 바로 캡처 팝업
+                    openCapturePopup(pageImages[0].dataUrl);
+                } else {
+                    // 여러 페이지면 페이지 선택 팝업
+                    openPdfPageSelector(pageImages);
+                }
+
+            } catch (err) {
+                loading.classList.remove('show');
+                console.error('PDF 변환 오류:', err);
+                addBotMessage('⚠️ PDF 변환 오류: ' + err.message);
+            }
+        }
+
+        // PDF 페이지 선택 팝업
+        function openPdfPageSelector(pageImages) {
+            const backdrop = document.createElement('div');
+            backdrop.className = 'capture-popup-backdrop';
+            backdrop.innerHTML = `
+            <div class="capture-popup" style="max-width:700px;">
+                <div class="capture-popup__header">
+                    <div>
+                        <div class="capture-popup__title">📄 PDF 페이지 선택</div>
+                        <div class="capture-popup__subtitle">수정할 페이지를 클릭하세요 (${pageImages.length}페이지)</div>
+                    </div>
+                    <button class="capture-popup__close" onclick="this.closest('.capture-popup-backdrop').remove()">✕</button>
+                </div>
+                <div style="padding:16px;overflow-y:auto;max-height:65vh;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;" id="pdfPageGrid"></div>
+            </div>`;
+            document.body.appendChild(backdrop);
+            const grid = backdrop.querySelector('#pdfPageGrid');
+
+            pageImages.forEach((pg, i) => {
+                const card = document.createElement('div');
+                card.style.cssText = 'border-radius:12px;overflow:hidden;border:2px solid var(--border);cursor:pointer;transition:all 0.2s;position:relative;';
+                card.innerHTML = `
+                    <img src="${pg.dataUrl}" style="width:100%;display:block;">
+                    <div style="position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,0.7);color:white;padding:2px 10px;border-radius:8px;font-size:11px;font-weight:600;">📄 ${pg.pageNum}페이지</div>
+                    <div style="position:absolute;inset:0;background:rgba(124,58,237,0.6);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;color:white;font-weight:700;font-size:13px;flex-direction:column;gap:4px;">
+                        <span style="font-size:24px;">✂️</span>이 페이지 수정
+                    </div>`;
+                card.onmouseenter = () => { card.style.borderColor = 'var(--primary)'; card.querySelector('div:last-child').style.opacity = '1'; };
+                card.onmouseleave = () => { card.style.borderColor = 'var(--border)'; card.querySelector('div:last-child').style.opacity = '0'; };
+                card.onclick = () => {
+                    document.getElementById('previewImg').src = pg.dataUrl;
+                    backdrop.remove();
+                    openCapturePopup(pg.dataUrl);
+                };
+                grid.appendChild(card);
+            });
+        }
+
+        function removeFile() {
+            document.getElementById('uploadedPreview').classList.remove('show');
+            uploadZone.style.display = '';
+            document.getElementById('analysisLoading').classList.remove('show');
+            document.getElementById('analysisResult').classList.remove('show');
+            analysisData = null;
+            fileInput.value = '';
+        }
+
+        async function analyzeFile(file) {
+            const loading = document.getElementById('analysisLoading');
+            const result = document.getElementById('analysisResult');
+            loading.classList.add('show');
+            result.classList.remove('show');
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const response = await fetch('/api/design/analyze', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error('분석 실패');
+                analysisData = await response.json();
+                renderAnalysis(analysisData);
+                loading.classList.remove('show');
+                result.classList.add('show');
+                ensureChatActive();
+                addBotMessage(
+                    `📊 톤앤매너 학습 완료! 아래 요소를 클릭하면 바로 수정할 수 있습니다.`,
+                    null,
+                    analysisData
+                );
+            } catch (err) {
+                loading.classList.remove('show');
+                addBotMessage('⚠️ 분석 오류: ' + err.message);
+            }
+        }
+
+        function renderAnalysis(data) {
+            document.getElementById('colorChips').innerHTML = (data.colors || []).map(c =>
+                `<div class="color-chip"><div class="swatch" style="background:${c.hex}"></div><span class="label">${c.hex}</span></div>`
+            ).join('');
+            document.getElementById('fontList').innerHTML = (data.fonts || []).map(f =>
+                `<div class="font-item"><div class="font-name">${f.name}</div><div class="font-detail">${f.usage || ''} · ${f.weight || ''}</div></div>`
+            ).join('');
+            document.getElementById('styleTags').innerHTML = (data.styles || []).map(s =>
+                `<span class="style-tag">${s}</span>`
+            ).join('');
+        }
+
+        // === URL 이미지 추출 ===
+        async function extractImages() {
+            const urlInput = document.getElementById('urlInput');
+            const url = urlInput.value.trim();
+            if (!url) return;
+
+            const btn = document.getElementById('extractBtn');
+            const loading = document.getElementById('galleryLoading');
+            const gallery = document.getElementById('imageGallery');
+
+            btn.disabled = true;
+            btn.textContent = '추출 중...';
+            loading.classList.add('show');
+            gallery.classList.remove('show');
+
+            try {
+                const response = await fetch('/api/design/extract-images', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url }),
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || '추출 실패');
+
+                renderGallery(data.images || []);
+                loading.classList.remove('show');
+                ensureChatActive();
+            } catch (err) {
+                loading.classList.remove('show');
+                alert('이미지 추출 실패: ' + err.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = '추출';
+        }
+
+        function renderGallery(images) {
+            const gallery = document.getElementById('imageGallery');
+            const grid = document.getElementById('galleryGrid');
+            const count = document.getElementById('imageCount');
+
+            if (images.length === 0) {
+                gallery.classList.remove('show');
+                alert('이미지를 찾을 수 없습니다.');
+                return;
+            }
+
+            count.textContent = images.length + '개';
+            grid.innerHTML = images.map((img, i) =>
+                `<div class="gallery-item" onclick="sendImageToChat('${img.url}', '${(img.alt || '이미지 ' + (i + 1)).replace(/'/g, "\\'")}')">
+          <img src="${img.url}" alt="${img.alt || ''}" onerror="this.parentElement.remove()" loading="lazy">
+          <div class="send-overlay">
+            <span>💬</span>
+            채팅에 전송
+          </div>
+        </div>`
+            ).join('');
+
+            gallery.classList.add('show');
+        }
+
+        // === 이미지 → 채팅 전송 ===
+        function sendImageToChat(imageUrl, altText) {
+            ensureChatActive();
+            chatAttachment = imageUrl;
+            chatAttachmentMime = 'url';
+
+            const preview = document.getElementById('chatAttPreview');
+            document.getElementById('chatAttImg').src = imageUrl;
+            document.getElementById('chatAttInfo').textContent = altText || '선택된 이미지';
+            preview.classList.add('show');
+
+            document.getElementById('chatInput').focus();
+            document.getElementById('chatInput').placeholder = '이 이미지에 대한 수정 지시를 입력하세요...';
+        }
+
+        function removeChatAttachment() {
+            chatAttachment = null;
+            chatAttachmentMime = null;
+            document.getElementById('chatAttPreview').classList.remove('show');
+            document.getElementById('chatInput').placeholder = '수정 지시를 입력하세요...';
+        }
+
+        function attachChatFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                chatAttachment = e.target.result;
+                chatAttachmentMime = file.type;
+                document.getElementById('chatAttImg').src = chatAttachment;
+                document.getElementById('chatAttInfo').textContent = file.name;
+                document.getElementById('chatAttPreview').classList.add('show');
+                document.getElementById('chatInput').focus();
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        }
+
+        // === 채팅 ===
+        function ensureChatActive() {
+            if (chatActivated) return;
+            chatActivated = true;
+            document.getElementById('welcomeState').style.display = 'none';
+            document.getElementById('chatMessages').style.display = 'flex';
+        }
+
+        // === Capture Popup ===
+        let capturedRegion = null;
+        let captureExtraDataUrl = null;
+
+        function handleCaptureExtraFile(event) {
+            const file = event.target.files[0];
+            if (!file || !file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                captureExtraDataUrl = e.target.result;
+                const preview = document.getElementById('captureExtraPreview');
+                document.getElementById('captureExtraImg').src = captureExtraDataUrl;
+                document.getElementById('captureExtraName').textContent = file.name;
+                if (preview) preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        }
+
+        function removeCaptureExtra() {
+            captureExtraDataUrl = null;
+            const preview = document.getElementById('captureExtraPreview');
+            if (preview) preview.style.display = 'none';
+        }
+
+        function openCapturePopup(imgSrc) {
+            let zoomLevel = 1;
+            const backdrop = document.createElement('div');
+            backdrop.className = 'capture-popup-backdrop';
+            backdrop.innerHTML = `
+            <div class="capture-popup">
+                <div class="capture-popup__header">
+                    <div>
+                        <div class="capture-popup__title">✂️ 어떤 부분을 변경하시겠습니까?</div>
+                        <div class="capture-popup__subtitle">마우스 드래그로 변경할 영역을 선택하세요 · 확대/축소로 정밀 선택</div>
+                    </div>
+                    <button class="capture-popup__close" id="captureClose">✕</button>
+                </div>
+                <div class="capture-popup__canvas" id="captureCanvas">
+                    <img src="${imgSrc}" id="capturePopupImg" draggable="false">
+                </div>
+                <div class="capture-popup__zoom-bar">
+                    <button id="cpZoomIn">＋</button>
+                    <span class="capture-popup__zoom-label" id="cpZoomLabel">100%</span>
+                    <button id="cpZoomOut">－</button>
+                    <button id="cpZoomFit" style="font-size:10px;width:auto;padding:0 10px;">FIT</button>
+                    <div style="flex:1;"></div>
+                    <button id="cpSelectAll" style="width:auto;padding:0 14px;font-size:11px;font-weight:600;color:var(--primary);">📐 전체 선택</button>
+                </div>
+                <div class="command-dialog" id="commandDialog" style="display:none;">
+                    <div class="command-dialog__label">💬 명령어를 입력해주세요</div>
+                    <div class="command-dialog__input-row">
+                        <label style="display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:14px;border:2px solid var(--border);background:var(--white);cursor:pointer;transition:all 0.2s;flex-shrink:0;" title="추가 이미지 업로드">
+                            <span style="font-size:20px;">📎</span>
+                            <input type="file" id="captureExtraFile" accept="image/*" style="display:none;" onchange="handleCaptureExtraFile(event)">
+                        </label>
+                        <input class="command-dialog__input" id="captureCommand" placeholder="예: 배경을 파란색으로 변경, 로고 추가, 텍스트 수정...">
+                        <button class="command-dialog__generate-btn" id="captureGenerateBtn">🎨 이미지 생성하기</button>
+                    </div>
+                    <div id="captureExtraPreview" style="display:none;margin-top:8px;padding:6px;background:var(--bg);border-radius:10px;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <img id="captureExtraImg" src="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">
+                            <span id="captureExtraName" style="font-size:11px;color:var(--text-sub);flex:1;"></span>
+                            <button onclick="removeCaptureExtra()" style="border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:14px;">✕</button>
+                        </div>
+                    </div>
+                    <div class="command-dialog__quick-actions">
+                        <button class="quick-cmd-btn" onclick="document.getElementById('captureCommand').value='배경색을 변경해주세요'">🎨 배경 변경</button>
+                        <button class="quick-cmd-btn" onclick="document.getElementById('captureCommand').value='텍스트를 추가해주세요: '">✏️ 텍스트 추가</button>
+                        <button class="quick-cmd-btn" onclick="document.getElementById('captureCommand').value='이 부분을 제거해주세요'">🗑️ 요소 제거</button>
+                        <button class="quick-cmd-btn" onclick="document.getElementById('captureCommand').value='로고를 삽입해주세요'">🏷️ 로고 삽입</button>
+                        <button class="quick-cmd-btn" onclick="document.getElementById('captureCommand').value='이미지 해상도를 높여주세요'">🔍 해상도 향상</button>
+                        <button class="quick-cmd-btn" onclick="document.getElementById('captureCommand').value='톤앤매너를 유지하면서 새 디자인 생성'">✨ 새 디자인</button>
+                    </div>
+                </div>
+            </div>`;
+            document.body.appendChild(backdrop);
+
+            const canvas = backdrop.querySelector('#captureCanvas');
+            const img = backdrop.querySelector('#capturePopupImg');
+            const cmdDialog = backdrop.querySelector('#commandDialog');
+            const zoomLabel = backdrop.querySelector('#cpZoomLabel');
+            let isDrawing = false, startX = 0, startY = 0, selEl = null;
+
+            function applyZoom() {
+                img.style.transform = `scale(${zoomLevel})`;
+                zoomLabel.textContent = Math.round(zoomLevel * 100) + '%';
+            }
+
+            backdrop.querySelector('#cpZoomIn').onclick = () => { zoomLevel = Math.min(zoomLevel + 0.25, 5); applyZoom(); };
+            backdrop.querySelector('#cpZoomOut').onclick = () => { zoomLevel = Math.max(zoomLevel - 0.25, 0.25); applyZoom(); };
+            backdrop.querySelector('#cpZoomFit').onclick = () => { zoomLevel = 1; applyZoom(); canvas.scrollTo(0, 0); };
+            backdrop.querySelector('#cpSelectAll').onclick = () => {
+                capturedRegion = { x: 0, y: 0, width: img.naturalWidth, height: img.naturalHeight, dataUrl: imgSrc };
+                if (selEl) selEl.remove();
+                selEl = document.createElement('div');
+                selEl.className = 'capture-popup__selection';
+                selEl.style.left = '0'; selEl.style.top = '0';
+                selEl.style.width = (img.naturalWidth * zoomLevel) + 'px';
+                selEl.style.height = (img.naturalHeight * zoomLevel) + 'px';
+                canvas.appendChild(selEl);
+                cmdDialog.style.display = 'block';
+            };
+
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                zoomLevel = e.deltaY < 0 ? Math.min(zoomLevel + 0.15, 5) : Math.max(zoomLevel - 0.15, 0.25);
+                applyZoom();
+            }, { passive: false });
+
+            backdrop.querySelector('#captureClose').onclick = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); backdrop.remove(); };
+
+            // Drawing selection
+            canvas.addEventListener('mousedown', (e) => {
+                if (e.target !== img && e.target !== canvas) return;
+                isDrawing = true;
+                const rect = img.getBoundingClientRect();
+                startX = (e.clientX - rect.left) / zoomLevel;
+                startY = (e.clientY - rect.top) / zoomLevel;
+                if (selEl) selEl.remove();
+                cmdDialog.style.display = 'none';
+                selEl = document.createElement('div');
+                selEl.className = 'capture-popup__selection';
+                canvas.appendChild(selEl);
+            });
+
+            const onMove = (e) => {
+                if (!isDrawing || !selEl) return;
+                const rect = img.getBoundingClientRect();
+                const curX = Math.max(0, Math.min((e.clientX - rect.left) / zoomLevel, img.naturalWidth));
+                const curY = Math.max(0, Math.min((e.clientY - rect.top) / zoomLevel, img.naturalHeight));
+                const x = Math.min(startX, curX), y = Math.min(startY, curY);
+                const w = Math.abs(curX - startX), h = Math.abs(curY - startY);
+                selEl.style.left = (x * zoomLevel) + 'px'; selEl.style.top = (y * zoomLevel) + 'px';
+                selEl.style.width = (w * zoomLevel) + 'px'; selEl.style.height = (h * zoomLevel) + 'px';
+                selEl._rx = x; selEl._ry = y; selEl._rw = w; selEl._rh = h;
+            };
+
+            const onUp = () => {
+                if (!isDrawing) return;
+                isDrawing = false;
+                if (!selEl || !selEl._rw || selEl._rw < 10 || selEl._rh < 10) {
+                    if (selEl) selEl.remove();
+                    selEl = null;
+                    return;
+                }
+                try {
+                    const c = document.createElement('canvas');
+                    c.width = Math.round(selEl._rw); c.height = Math.round(selEl._rh);
+                    c.getContext('2d').drawImage(img, selEl._rx, selEl._ry, selEl._rw, selEl._rh, 0, 0, c.width, c.height);
+                    capturedRegion = { x: selEl._rx, y: selEl._ry, width: c.width, height: c.height, dataUrl: c.toDataURL('image/png') };
+                } catch (err) {
+                    capturedRegion = { x: selEl._rx, y: selEl._ry, width: selEl._rw, height: selEl._rh, dataUrl: imgSrc };
+                }
+                cmdDialog.style.display = 'block';
+                backdrop.querySelector('#captureCommand').focus();
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+
+            // Generate button
+            backdrop.querySelector('#captureGenerateBtn').onclick = async () => {
+                const cmd = backdrop.querySelector('#captureCommand').value.trim();
+                if (!cmd) { backdrop.querySelector('#captureCommand').style.borderColor = '#ef4444'; return; }
+
+                const btn = backdrop.querySelector('#captureGenerateBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin:0;border-width:2px;"></div> 생성 중...';
+
+                const regionImg = capturedRegion?.dataUrl || imgSrc;
+                chatAttachment = regionImg;
+                chatAttachmentMime = regionImg.startsWith('data:') ? 'image/png' : 'url';
+                document.getElementById('chatAttImg').src = regionImg;
+                document.getElementById('chatAttInfo').textContent = '선택 영역 (' + Math.round(capturedRegion?.width || 0) + '×' + Math.round(capturedRegion?.height || 0) + 'px)';
+                document.getElementById('chatAttPreview').classList.add('show');
+                document.getElementById('chatInput').value = cmd;
+
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                backdrop.remove();
+
+                await sendDesignChat();
+            };
+
+            backdrop.querySelector('#captureCommand').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    backdrop.querySelector('#captureGenerateBtn').click();
+                }
+            });
+        }
+
+        // === Interactive Chat Actions ===
+        function chatAction(action, value) {
+            const input = document.getElementById('chatInput');
+            switch (action) {
+                case 'change-color':
+                    input.value = `이 이미지에서 ${value} 색상을 다른 색상으로 변경해주세요.`;
+                    input.focus();
+                    break;
+                case 'change-font':
+                    input.value = `폰트를 ${value}(으)로 변경해주세요.`;
+                    input.focus();
+                    break;
+                case 'change-bg':
+                    input.value = '배경을 변경해주세요. ';
+                    input.focus();
+                    break;
+                case 'add-text':
+                    input.value = '다음 텍스트를 추가해주세요: ';
+                    input.focus();
+                    break;
+                case 'change-layout':
+                    input.value = '레이아웃을 변경해주세요. ';
+                    input.focus();
+                    break;
+                case 'remove-element':
+                    input.value = `이미지에서 ${value || '해당 요소'}를 제거해주세요.`;
+                    input.focus();
+                    break;
+                case 'resize':
+                    input.value = `이미지를 ${value || '1080x1080'} 규격으로 조정해주세요.`;
+                    input.focus();
+                    break;
+                case 'generate':
+                    input.value = value || '';
+                    sendDesignChat();
+                    break;
+                case 'edit-prop':
+                    input.value = `${value}을(를) 수정해주세요: `;
+                    input.focus();
+                    break;
+                default:
+                    input.value = value || '';
+                    input.focus();
+            }
+        }
+
+        // Build structured bot message
+        function buildBotMsgHTML(text, imageUrl, analysisInfo) {
+            let html = `<div class="msg-label">🎨 디자인 AI · Gemini 3 Flash</div>`;
+
+            if (analysisInfo) {
+                // Structured analysis response
+                if (analysisInfo.colors && analysisInfo.colors.length > 0) {
+                    html += `<div class="msg-section">`;
+                    html += `<div class="msg-section-title">🎨 색상 팔레트</div>`;
+                    html += `<div class="msg-color-row">`;
+                    analysisInfo.colors.forEach(c => {
+                        html += `<div class="msg-color-chip" onclick="chatAction('change-color','${c.hex}')" title="클릭하여 수정">`;
+                        html += `<div class="chip-swatch" style="background:${c.hex}"></div>${c.hex}</div>`;
+                    });
+                    html += `</div></div>`;
+                }
+
+                if (analysisInfo.fonts && analysisInfo.fonts.length > 0) {
+                    html += `<div class="msg-section">`;
+                    html += `<div class="msg-section-title">🔤 타이포그래피</div>`;
+                    html += `<div class="msg-prop-list">`;
+                    analysisInfo.fonts.forEach(f => {
+                        html += `<div class="msg-prop-item" onclick="chatAction('change-font','${f.name}')">`;
+                        html += `<span class="prop-label">${f.name}</span>`;
+                        html += `<span class="prop-value">${f.usage || ''} · ${f.weight || ''}</span>`;
+                        html += `<span class="prop-edit">✏️ 수정</span></div>`;
+                    });
+                    html += `</div></div>`;
+                }
+
+                if (analysisInfo.styles && analysisInfo.styles.length > 0) {
+                    html += `<div class="msg-section">`;
+                    html += `<div class="msg-section-title">✨ 디자인 스타일</div>`;
+                    html += `<div style="display:flex;flex-wrap:wrap;gap:5px;">`;
+                    analysisInfo.styles.forEach(s => {
+                        html += `<span class="msg-editable-tag" onclick="chatAction('edit-prop','${s}')">${s} <span class="edit-icon">✏️</span></span>`;
+                    });
+                    html += `</div></div>`;
+                }
+
+                // Score bars if available
+                if (analysisInfo.scores) {
+                    html += `<div class="msg-section">`;
+                    html += `<div class="msg-section-title">📊 디자인 품질 점수</div>`;
+                    Object.entries(analysisInfo.scores).forEach(([k, v]) => {
+                        const pct = Math.round(v * 100);
+                        const color = pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444';
+                        html += `<div class="msg-chart-bar">`;
+                        html += `<span class="bar-label">${k}</span>`;
+                        html += `<div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>`;
+                        html += `<span class="bar-value">${pct}%</span></div>`;
+                    });
+                    html += `</div>`;
+                }
+            }
+
+            // Text content
+            if (text) {
+                html += `<div style="margin-top:8px;">${text.replace(/\n/g, '<br>')}</div>`;
+            }
+
+            // Generated image with download
+            if (imageUrl) {
+                const imgId = 'genImg_' + Date.now();
+                html += `<div style="position:relative;margin-top:10px;">
+                    <img class="generated-image" id="${imgId}" src="${imageUrl}" alt="수정된 이미지" style="border-radius:12px;max-width:100%;cursor:pointer;" onclick="window.lastEditedImage='${imageUrl}'">
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <button onclick="downloadImage('${imgId}')" style="flex:1;padding:10px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">⬇️ 다운로드</button>
+                        <button onclick="reuseEditedImage('${imgId}')" style="flex:1;padding:10px;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">🔄 추가 수정</button>
+                    </div>
+                </div>`;
+            }
+
+            // Action buttons
+            html += `<div class="msg-actions">`;
+            html += `<button class="msg-action-btn" onclick="chatAction('change-bg')">🎨 배경 변경</button>`;
+            html += `<button class="msg-action-btn" onclick="chatAction('add-text')">✏️ 텍스트 추가</button>`;
+            html += `<button class="msg-action-btn" onclick="chatAction('change-layout')">📐 레이아웃</button>`;
+            html += `<button class="msg-action-btn" onclick="chatAction('resize','1080x1080')">📏 규격 조정</button>`;
+            html += `<button class="msg-action-btn" onclick="chatAction('remove-element')">🗑️ 요소 제거</button>`;
+            html += `</div>`;
+
+            return html;
+        }
+
+        function addBotMessage(text, imageUrl, analysisInfo) {
+            ensureChatActive();
+            const msgs = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'chat-msg bot';
+            div.innerHTML = buildBotMsgHTML(text, imageUrl, analysisInfo);
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+
+        function addUserMessage(text, imgSrc) {
+            const msgs = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'chat-msg user';
+            let html = `<div class="msg-label">사용자</div>`;
+            if (imgSrc) html += `<img class="msg-image" src="${imgSrc}">`;
+            html += text.replace(/\n/g, '<br>');
+            div.innerHTML = html;
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+
+        async function sendDesignChat() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text && !chatAttachment) return;
+
+            const attachSrc = chatAttachment;
+            const attachMime = chatAttachmentMime;
+            addUserMessage(text, attachSrc);
+            input.value = '';
+            removeChatAttachment();
+
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+
+            // Show typing indicator
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'chat-msg bot';
+            typingDiv.innerHTML = `<div class="msg-label">🎨 디자인 AI</div><div style="display:flex;align-items:center;gap:6px;"><div class="spinner" style="width:16px;height:16px;margin:0;border-width:2px;"></div><span style="font-size:12px;color:var(--text-muted);">분석 중...</span></div>`;
+            document.getElementById('chatMessages').appendChild(typingDiv);
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+
+            try {
+                const body = {
+                    message: text,
+                    analysis: analysisData,
+                    sessionId,
+                };
+
+                // 첨부 처리 (대용량 이미지 압축)
+                if (attachSrc) {
+                    if (attachMime === 'url') {
+                        body.imageUrl = attachSrc;
+                    } else if (attachSrc.startsWith('data:')) {
+                        // 이미지를 압축하여 전송 (최대 1600px 폭)
+                        body.attachmentDataUrl = await compressImage(attachSrc, 1600, 0.8);
+                    }
+                }
+
+                const response = await fetch('/api/design/modify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+
+                typingDiv.remove();
+
+                // 응답 상태 확인
+                if (!response.ok) {
+                    const errText = await response.text().catch(() => '');
+                    if (response.status === 413) {
+                        addBotMessage('⚠️ 이미지 크기가 너무 큽니다. 더 작은 이미지를 선택하거나 영역을 작게 잡아주세요.');
+                    } else if (response.status === 500) {
+                        addBotMessage('⚠️ AI 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+                    } else {
+                        addBotMessage(`⚠️ 서버 응답 오류 (${response.status}). 잠시 후 다시 시도해주세요.`);
+                    }
+                    sendBtn.disabled = false;
+                    return;
+                }
+
+                // 안전한 JSON 파싱
+                let result;
+                try {
+                    const responseText = await response.text();
+                    result = JSON.parse(responseText);
+                } catch (parseErr) {
+                    addBotMessage('⚠️ 응답 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+                    sendBtn.disabled = false;
+                    return;
+                }
+
+                addBotMessage(
+                    result.response || '처리가 완료되었습니다.',
+                    result.generatedImage || null,
+                    result.analysis || null
+                );
+            } catch (err) {
+                typingDiv.remove();
+                if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+                    addBotMessage('⚠️ 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+                } else {
+                    addBotMessage('⚠️ 네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
+                }
+            }
+
+            sendBtn.disabled = false;
+        }
+
+        // 이미지 압축 유틸리티
+        function compressImage(dataUrl, maxWidth, quality) {
+            return new Promise((resolve) => {
+                if (!dataUrl || !dataUrl.startsWith('data:image')) {
+                    resolve(dataUrl);
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width, h = img.height;
+                    if (w > maxWidth) {
+                        h = Math.round(h * maxWidth / w);
+                        w = maxWidth;
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    resolve(canvas.toDataURL('image/jpeg', quality || 0.8));
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+            });
+        }
+
+        // 이미지 다운로드
+        function downloadImage(imgId) {
+            const img = document.getElementById(imgId);
+            if (!img || !img.src) return;
+            const link = document.createElement('a');
+            link.href = img.src;
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+            link.download = `infam-design-${timestamp}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 수정된 이미지로 추가 수정 시작
+        function reuseEditedImage(imgId) {
+            const img = document.getElementById(imgId);
+            if (!img || !img.src) return;
+            // 수정된 이미지를 채팅 첨부로 설정
+            chatAttachment = img.src;
+            chatAttachmentMime = 'image/png';
+            const attachEl = document.getElementById('chatAttachment');
+            if (attachEl) {
+                attachEl.innerHTML = `<img src="${img.src}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;"><span style="font-size:11px;color:var(--text-sub);">수정된 이미지</span><button onclick="removeChatAttachment()" style="border:none;background:none;color:var(--text-muted);cursor:pointer;">✕</button>`;
+                attachEl.style.display = 'flex';
+            }
+            document.getElementById('chatInput').placeholder = '추가 수정 지시를 입력하세요...';
+            document.getElementById('chatInput').focus();
+        }
+
+        // === 레이어 분해 ===
+        let layeredReady = false;
+
+        async function checkLayeredStatus() {
+            const statusEl = document.getElementById('layerStatus');
+            const section = document.getElementById('layerSection');
+            try {
+                const res = await fetch('/api/layered/status');
+                const data = await res.json();
+                if (data.loaded) {
+                    statusEl.innerHTML = '<span class="dot green"></span> 준비 완료';
+                    layeredReady = true;
+                    document.getElementById('decomposeBtn').disabled = false;
+                } else if (data.loading) {
+                    statusEl.innerHTML = '<span class="dot yellow"></span> 모델 로딩 중...';
+                    setTimeout(checkLayeredStatus, 10000);
+                } else {
+                    statusEl.innerHTML = '<span class="dot red"></span> ' + (data.error || '오프라인');
+                }
+            } catch {
+                statusEl.innerHTML = '<span class="dot red"></span> 서비스 연결 대기';
+                setTimeout(checkLayeredStatus, 15000);
+            }
+        }
+
+        // 업로드된 파일이나 갤러리 이미지가 있을 때 레이어 섹션 표시
+        function showLayerSection() {
+            document.getElementById('layerSection').classList.add('show');
+        }
+
+        async function decomposeImage() {
+            const btn = document.getElementById('decomposeBtn');
+            btn.disabled = true;
+            btn.textContent = '🧠 분해 중... (약 30초~1분)';
+
+            // 첨부 이미지 또는 업로드된 이미지 사용
+            let imageSource = null;
+            if (chatAttachment && chatAttachmentMime === 'url') {
+                imageSource = { image_url: chatAttachment };
+            } else if (chatAttachment && chatAttachment.startsWith('data:')) {
+                imageSource = { image_base64: chatAttachment };
+            } else {
+                const previewImg = document.getElementById('previewImg');
+                if (previewImg.src && !previewImg.src.includes('svg+xml')) {
+                    // 업로드된 이미지를 canvas로 변환
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = previewImg.naturalWidth;
+                        canvas.height = previewImg.naturalHeight;
+                        canvas.getContext('2d').drawImage(previewImg, 0, 0);
+                        imageSource = { image_base64: canvas.toDataURL('image/png') };
+                    } catch {
+                        addBotMessage('⚠️ 레이어 분해할 이미지를 먼저 선택해주세요.');
+                        btn.disabled = false;
+                        btn.textContent = '🧩 이미지 레이어 분해';
+                        return;
+                    }
+                }
+            }
+
+            if (!imageSource) {
+                addBotMessage('⚠️ 레이어 분해할 이미지를 먼저 업로드하거나 선택해주세요.');
+                btn.disabled = false;
+                btn.textContent = '🧩 이미지 레이어 분해';
+                return;
+            }
+
+            try {
+                const formData = new URLSearchParams(imageSource);
+                const res = await fetch('/api/layered/decompose', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData,
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.detail || '분해 실패');
+
+                // 레이어 그리드 표시
+                const grid = document.getElementById('layerGrid');
+                grid.innerHTML = data.layers.map(layer =>
+                    `<div class="layer-card" onclick="sendImageToChat('${layer.url}', 'Layer ${layer.index}')">
+                        <img src="${layer.url}" alt="Layer ${layer.index}" loading="lazy">
+                        <span class="layer-label">Layer ${layer.index}</span>
+                    </div>`
+                ).join('');
+
+                ensureChatActive();
+                addBotMessage(`🧩 레이어 분해 완료! ${data.total_layers}개 레이어로 분리되었습니다.\n\n각 레이어를 클릭하면 채팅에 전송되어 개별 수정이 가능합니다.`);
+            } catch (err) {
+                addBotMessage('❌ 레이어 분해 오류: ' + err.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🧩 이미지 레이어 분해';
+        }
+
+        // 페이지 로드 시 레이어 서비스 상태 확인
+        setTimeout(() => {
+            checkLayeredStatus();
+            showLayerSection();
+        }, 2000);
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+    </script>
+</body>
+
+</html>

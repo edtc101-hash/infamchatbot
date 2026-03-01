@@ -206,13 +206,13 @@ function stripEmojis(text) {
     return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}\u{2328}\u{23CF}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}]/gu, '').replace(/\s{2,}/g, ' ').trim();
 }
 
-// 봇 메시지 복사 (이모티콘 제거, 링크 포함)
+// 봇 메시지 복사 (화면에 보이는 대로 줄바꿈 유지)
 function copyBotMessage(btn) {
     const group = btn.closest('.message-group');
     const bubble = group.querySelector('.bubble');
 
-    // 텍스트 추출 (HTML → plaintext)
     const clone = bubble.cloneNode(true);
+
     // 링크 카드에서 URL 추출
     const linkCards = clone.querySelectorAll('.link-card');
     const urls = [];
@@ -233,12 +233,20 @@ function copyBotMessage(btn) {
         }
     });
 
-    // br → 줄바꿈
-    clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+    // HTML → 줄바꿈 보존 텍스트 변환
+    // <br> → 줄바꿈
+    clone.querySelectorAll('br').forEach(br => {
+        br.replaceWith(document.createTextNode('\n'));
+    });
+    // <p>, <div>, <li> 등 블록 요소 앞뒤에 줄바꿈 삽입
+    clone.querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6').forEach(el => {
+        el.prepend(document.createTextNode('\n'));
+        el.append(document.createTextNode('\n'));
+    });
 
     let text = clone.textContent || '';
     text = stripEmojis(text);
-    // 여러 줄바꿈 정리
+    // 3줄 이상 연속 줄바꿈 → 2줄로 정리
     text = text.replace(/\n{3,}/g, '\n\n').trim();
 
     // 중복 URL 제거 후 링크 추가
@@ -248,14 +256,13 @@ function copyBotMessage(btn) {
     }
 
     navigator.clipboard.writeText(text).then(() => {
-        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> 복사됨';
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> 복사됨';
         btn.classList.add('copied');
         setTimeout(() => {
-            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> 복사';
+            btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> 복사';
             btn.classList.remove('copied');
         }, 2000);
     }).catch(() => {
-        // fallback
         const ta = document.createElement('textarea');
         ta.value = text;
         document.body.appendChild(ta);
@@ -295,24 +302,105 @@ function getSourceBadge(data) {
     return '<span class="source-badge ai">🤖 AI 생성 답변</span>';
 }
 
-// FAQ 매칭 카드 생성
+// FAQ 매칭 카드 — 대화창에 표시하지 않음 (사용자 요청)
 function getFAQMatchHtml(matchedFAQs) {
-    if (!matchedFAQs || matchedFAQs.length === 0) return '';
-    return `<div class="faq-match-card">
-        <div class="faq-match-title">🔍 관련 FAQ ${matchedFAQs.length}건 매칭됨</div>
+    return '';
+}
+
+// RAG 소스 카드 생성 — 고객 채팅 데이터 기준
+function getRAGSourceHtml(ragSources) {
+    if (!ragSources || ragSources.length === 0) return '';
+    return `<div class="faq-match-card" style="border-left-color: #8b5cf6;">
+        <div class="faq-match-title" style="color: #8b5cf6;">고객 채팅 데이터를 기준으로 ${ragSources.length}건 참조</div>
         <div class="faq-match-list">
-            ${matchedFAQs.map(f => `<div class="faq-match-item" onclick="sendQuickMessage('${escapeAttr(f.question)}')">${f.question}</div>`).join('')}
+            ${ragSources.map(r => {
+        const pct = Math.round(parseFloat(r.score) * 100);
+        return `<div class="faq-match-item" onclick="openEditPopup('rag', '${escapeAttr(r.title)}', '${escapeAttr(r.content || '')}', '${escapeAttr(r.category)}', ${pct})" title="클릭하여 편집">[${escapeHtml(r.category)}] ${escapeHtml(r.title)} <span style="color:#8b5cf6;font-size:11px;font-weight:600;">${pct}%</span></div>`;
+    }).join('')}
         </div>
     </div>`;
 }
 
-// RAG 소스 카드 생성
-function getRAGSourceHtml(ragSources) {
-    if (!ragSources || ragSources.length === 0) return '';
-    return `<div class="faq-match-card" style="border-left-color: #8b5cf6;">
-        <div class="faq-match-title" style="color: #8b5cf6;">🧠 RAG 의미 검색 ${ragSources.length}건 참조</div>
-        <div class="faq-match-list">
-            ${ragSources.map(r => `<div class="faq-match-item" style="cursor:default;">[${r.category}] ${r.title} <span style="color:#8b5cf6;font-size:11px;">(유사도: ${r.score})</span></div>`).join('')}
+// === 편집 팝업 ===
+function openEditPopup(type, question, answer, category, score) {
+    // 기존 팝업 제거
+    const old = document.getElementById('editPopupOverlay');
+    if (old) old.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'editPopupOverlay';
+    overlay.className = 'edit-popup-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    const typeLabel = type === 'faq' ? '📋 FAQ 편집' : '🧠 RAG 학습 데이터 편집';
+    const scoreHtml = score ? `<span class="edit-popup-score">${score}% 유사도</span>` : '';
+    const catHtml = category ? `<span class="edit-popup-cat">${category}</span>` : '';
+
+    overlay.innerHTML = `
+    <div class="edit-popup">
+        <div class="edit-popup-header">
+            <div class="edit-popup-title">${typeLabel} ${catHtml} ${scoreHtml}</div>
+            <button class="edit-popup-close" onclick="this.closest('.edit-popup-overlay').remove()">✕</button>
+        </div>
+        <div class="edit-popup-body">
+            <label class="edit-popup-label">질문 (Q)</label>
+            <textarea class="edit-popup-textarea" id="popupQuestion" rows="2">${question}</textarea>
+            <label class="edit-popup-label">답변 (A)</label>
+            <textarea class="edit-popup-textarea" id="popupAnswer" rows="6" placeholder="수정할 답변을 입력하세요...">${answer}</textarea>
+        </div>
+        <div class="edit-popup-footer">
+            <button class="edit-popup-cancel" onclick="this.closest('.edit-popup-overlay').remove()">취소</button>
+            <button class="edit-popup-save" onclick="savePopupEdit(this)">💾 저장 & 학습</button>
+        </div>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    // 답변이 비어있으면 답변 textarea에 포커스
+    setTimeout(() => {
+        const target = answer ? document.getElementById('popupQuestion') : document.getElementById('popupAnswer');
+        if (target) target.focus();
+    }, 100);
+}
+
+async function savePopupEdit(btn) {
+    const overlay = btn.closest('.edit-popup-overlay');
+    const question = document.getElementById('popupQuestion').value.trim();
+    const answer = document.getElementById('popupAnswer').value.trim();
+    if (!question || !answer) { alert('질문과 답변을 모두 입력해주세요.'); return; }
+
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
+
+    try {
+        const res = await fetch('/api/admin/learn-correction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question, answer })
+        });
+        const data = await res.json();
+        if (data.success) {
+            btn.textContent = '✅ 저장 완료!';
+            btn.style.background = '#22c55e';
+            setTimeout(() => overlay.remove(), 1200);
+        } else {
+            alert('저장 실패: ' + (data.error || '알 수 없는 오류'));
+            btn.disabled = false;
+            btn.textContent = '💾 저장 & 학습';
+        }
+    } catch (e) {
+        alert('저장 요청 실패: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '💾 저장 & 학습';
+    }
+}
+
+// 후속 질문 버튼 생성
+function getSuggestedQuestionsHtml(suggestedQuestions) {
+    if (!suggestedQuestions || suggestedQuestions.length === 0) return '';
+    return `<div class="suggested-questions">
+        <div class="suggested-title">💡 이런 것도 궁금하신가요?</div>
+        <div class="suggested-list">
+            ${suggestedQuestions.map(q => `<button class="suggested-btn" onclick="sendQuickMessage('${escapeAttr(q)}')">${escapeHtml(q)}</button>`).join('')}
         </div>
     </div>`;
 }
@@ -345,17 +433,34 @@ async function sendMessage() {
         const data = await response.json();
         typingEl.remove();
 
-        const responseText = data.response || '오류가 발생했습니다.';
+        let responseText = data.response || '오류가 발생했습니다.';
+        // 로봇 같은 인사말 제거
+        responseText = responseText
+            .replace(/^(안녕하세요[!.]?\s*(인팸|인팸의)?\s*(어시스턴트|AI)?[가-힣]*[!.\s]*)/i, '')
+            .replace(/^(반갑습니다[!.]?\s*)/i, '')
+            .replace(/^(안녕하세요[!]?\s*)/i, '')
+            .replace(/^(네[,!]?\s*안녕하세요[!.]?\s*)/i, '')
+            .replace(/^(\s*\n)+/, '')
+            // 빈 링크/괄호 제거: [텍스트]() → 텍스트, 단독 () 제거
+            .replace(/\[([^\]]+)\]\(\s*\)/g, '$1')
+            .replace(/\(\s*\)/g, '')
+            // 문장 끝 마침표 뒤에 줄바꿈 추가 (가독성)
+            .replace(/(다|요|죠|세요|니다|습니다|겠습니다|드립니다|드릴게요|바랍니다|됩니다|있습니다|없습니다|됩니다|주세요|합니다|입니다|십시오|하세요|릅니다|옵니다)\.\s+/g, '$1.\n\n')
+            .trim();
         const sourceBadge = getSourceBadge(data);
         const faqMatchHtml = getFAQMatchHtml(data.matchedFAQs) + getRAGSourceHtml(data.ragSources);
 
-        addMessage(responseText, 'bot', sourceBadge, faqMatchHtml, lastUserQuestion);
+        // 후속 질문 HTML 생성
+        const suggestedHtml = getSuggestedQuestionsHtml(data.suggestedQuestions);
+
+        addMessage(responseText, 'bot', sourceBadge, faqMatchHtml + suggestedHtml, lastUserQuestion);
     } catch (error) {
         typingEl.remove();
+        console.error('채팅 API 오류:', error);
         addMessage(
-            '연결에 문제가 발생했습니다.\n\n담당자 문의: 010-6802-9124 (김동현 팀장)',
+            '서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.\n\n계속 연결이 안 되면 담당자에게 문의해 주세요.\n김동현 팀장: 010-6802-9124',
             'bot',
-            '<span class="source-badge fallback">⚠️ 연결 오류</span>'
+            '<span class="source-badge fallback">⚠️ 서버 연결 실패</span>'
         );
     } finally {
         isLoading = false;
@@ -387,7 +492,7 @@ function addMessage(text, type, sourceBadge = '', faqMatchHtml = '', originalQue
         : `<div class="msg-avatar user">👤</div>`;
     const formattedText = formatMessage(text);
 
-    const copyBtnHtml = type === 'bot' ? `<button class="copy-msg-btn" onclick="copyBotMessage(this)" title="텍스트 복사"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> 복사</button>` : '';
+    const copyBtnHtml = type === 'bot' ? `<button class="copy-msg-btn" onclick="copyBotMessage(this)" title="텍스트 복사"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> 복사</button>` : '';
     const editBtnHtml = type === 'bot' ? `<button class="edit-msg-btn" onclick="editBotMessage(this)" title="답변 수정 후 학습">✏️ 바로수정</button>` : '';
 
     group.innerHTML = `
@@ -484,7 +589,7 @@ function editBotMessage(btn) {
     textarea.rows = Math.max(5, rawText.split('\n').length + 2);
     const editActions = document.createElement('div');
     editActions.className = 'edit-actions';
-    editActions.innerHTML = '<button class="edit-save-btn" onclick="saveBotEdit(this)">저장 & 학습</button><button class="edit-cancel-btn" onclick="cancelBotEdit(this)">취소</button>';
+    editActions.innerHTML = '<button class="edit-ai-btn" onclick="aiImproveAnswer(this)">🤖 AI 개선</button><button class="edit-save-btn" onclick="saveBotEdit(this)">저장 & 학습</button><button class="edit-cancel-btn" onclick="cancelBotEdit(this)">취소</button>';
     bubble.innerHTML = '';
     bubble.appendChild(textarea);
     bubble.appendChild(editActions);
@@ -532,4 +637,56 @@ function cancelBotEdit(btn) {
     group.classList.remove('editing');
     const editBtn = group.querySelector('.edit-msg-btn');
     if (editBtn) editBtn.style.display = '';
+}
+
+// AI로 답변 개선
+async function aiImproveAnswer(btn) {
+    const group = btn.closest('.message-group');
+    const bubble = group.querySelector('.bubble');
+    const textarea = bubble.querySelector('.edit-textarea');
+    const question = group.getAttribute('data-question') || '';
+    const currentAnswer = textarea.value.trim();
+
+    if (!currentAnswer) {
+        alert('개선할 답변 내용이 없습니다.');
+        return;
+    }
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '🧠 AI 분석 중...';
+    btn.style.opacity = '0.7';
+
+    try {
+        const res = await fetch('/api/admin/improve-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question, currentAnswer })
+        });
+        const data = await res.json();
+
+        if (data.success && data.improvedAnswer) {
+            textarea.value = data.improvedAnswer;
+            textarea.style.borderColor = '#22c55e';
+            textarea.style.background = '#f0fdf4';
+            btn.textContent = '✅ 개선 완료!';
+            setTimeout(() => {
+                btn.textContent = '🤖 AI 개선';
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                textarea.style.borderColor = '';
+                textarea.style.background = '';
+            }, 2000);
+        } else {
+            alert('AI 개선 실패: ' + (data.error || '알 수 없는 오류'));
+            btn.textContent = originalText;
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    } catch (e) {
+        alert('AI 개선 요청 실패: ' + e.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }
 }

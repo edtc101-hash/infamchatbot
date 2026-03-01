@@ -1,7 +1,7 @@
 /**
- * 로컬 JSON 기반 벡터 스토어
- * mcp-ragchat의 vector-store.ts를 JavaScript로 포팅
+ * 인메모리 + 파일 벡터 스토어
  * 코사인 유사도 검색으로 의미 기반 문서 검색
+ * 인메모리 캐시로 매 검색마다 파일 I/O 최소화
  */
 
 const fs = require('fs');
@@ -14,25 +14,41 @@ if (!fs.existsSync(VECTORS_DIR)) {
     fs.mkdirSync(VECTORS_DIR, { recursive: true });
 }
 
+// 인메모리 캐시
+let _vectorCache = null;
+let _cacheTimestamp = 0;
+
 function vectorsPath() {
     return path.join(VECTORS_DIR, 'vectors.json');
 }
 
-/** 벡터 데이터 로드 */
+/** 벡터 데이터 로드 (인메모리 캐시 우선) */
 function loadVectors() {
+    // 인메모리 캐시가 있으면 사용
+    if (_vectorCache !== null) return _vectorCache;
+
     const p = vectorsPath();
-    if (!fs.existsSync(p)) return [];
+    if (!fs.existsSync(p)) {
+        _vectorCache = [];
+        return [];
+    }
     try {
-        return JSON.parse(fs.readFileSync(p, 'utf-8'));
+        const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+        _vectorCache = data;
+        _cacheTimestamp = Date.now();
+        return data;
     } catch (e) {
         console.error('벡터 데이터 로드 오류:', e.message);
+        _vectorCache = [];
         return [];
     }
 }
 
-/** 벡터 데이터 저장 */
+/** 벡터 데이터 저장 (인메모리 + 파일) */
 function saveVectors(docs) {
-    fs.writeFileSync(vectorsPath(), JSON.stringify(docs, null, 2), 'utf-8');
+    _vectorCache = docs;
+    _cacheTimestamp = Date.now();
+    fs.writeFileSync(vectorsPath(), JSON.stringify(docs), 'utf-8');
 }
 
 /** 문서 추가 (같은 ID면 교체) */
@@ -58,7 +74,7 @@ function addDocumentsBatch(newDocs) {
 
 /** 코사인 유사도 계산 */
 function cosineSimilarity(a, b) {
-    if (a.length !== b.length) return 0;
+    if (!a || !b || a.length !== b.length || a.length === 0) return 0;
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
@@ -72,9 +88,9 @@ function cosineSimilarity(a, b) {
 }
 
 /** 임베딩 벡터로 유사 문서 검색 */
-function searchByEmbedding(queryEmbedding, limit = 5, minScore = 0.3) {
+function searchByEmbedding(queryEmbedding, limit = 5, minScore = 0.4) {
     const docs = loadVectors();
-    if (docs.length === 0) return [];
+    if (docs.length === 0 || !queryEmbedding || queryEmbedding.length === 0) return [];
 
     const scored = docs
         .map(doc => ({
@@ -110,12 +126,14 @@ function getStats() {
         totalDocuments: docs.length,
         categories,
         lastBuilt,
-        vectorsDimension: docs.length > 0 ? docs[0].embedding.length : 0,
+        vectorsDimension: docs.length > 0 && docs[0].embedding ? docs[0].embedding.length : 0,
+        cached: _vectorCache !== null,
     };
 }
 
 /** 벡터 스토어 초기화 (전체 삭제) */
 function clearVectors() {
+    _vectorCache = null;
     saveVectors([]);
 }
 
