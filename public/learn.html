@@ -935,6 +935,69 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
         }
 
+        .qa-card__actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .qa-improve-btn {
+            padding: 5px 12px;
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .2s;
+        }
+
+        .qa-improve-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .qa-improve-btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .qa-save-btn {
+            padding: 5px 12px;
+            background: linear-gradient(135deg, #16a34a, #22c55e);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .2s;
+            display: none;
+        }
+
+        .qa-save-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .qa-card__improved {
+            margin-top: 8px;
+            padding: 10px 14px;
+            background: rgba(176, 141, 87, .06);
+            border: 1px solid rgba(176, 141, 87, .15);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--gray-700);
+            display: none;
+        }
+
+        .qa-card__improved.show {
+            display: block;
+        }
+
         /* 파일 업로드 영역 (사이드 패널 내) */
         .upload-bar {
             background: linear-gradient(135deg, var(--primary), var(--gray-700));
@@ -1290,14 +1353,19 @@
                 body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">추출된 데이터가 없습니다.</div>';
             } else {
                 body.innerHTML = lastExtractedItems.map((item, i) => `
-                    <div class="qa-card">
+                    <div class="qa-card" id="qaCard${i}">
                         <div class="qa-card__category">${escapeHtml(item.category || '기타')}</div>
                         <div class="qa-card__q">Q${i + 1}. ${escapeHtml(item.question)}</div>
-                        <div class="qa-card__a">${escapeHtml(item.answer)}</div>
+                        <div class="qa-card__a" id="qaAnswer${i}">${escapeHtml(item.answer)}</div>
                         ${item.keywords && item.keywords.length ? `
-                            <div class="qa-card__keywords">
+                            <div class="qa-card__keywords" id="qaKeywords${i}">
                                 ${item.keywords.map(k => `<span>${escapeHtml(k)}</span>`).join('')}
-                            </div>` : ''}
+                            </div>` : '<div class="qa-card__keywords" id="qaKeywords' + i + '"></div>'}
+                        <div class="qa-card__improved" id="qaImproved${i}"></div>
+                        <div class="qa-card__actions">
+                            <button class="qa-improve-btn" id="improveBtn${i}" onclick="improveAnswer(${i})">✨ AI 개선</button>
+                            <button class="qa-save-btn" id="saveBtn${i}" onclick="saveImprovedAnswer(${i})">✅ 저장 & 학습</button>
+                        </div>
                     </div>
                 `).join('');
             }
@@ -1309,6 +1377,85 @@
         document.getElementById('qaPreviewOverlay').addEventListener('click', function (e) {
             if (e.target === this) closeQAPreview();
         });
+
+        // AI 답변 개선
+        async function improveAnswer(idx) {
+            const item = lastExtractedItems[idx];
+            const btn = document.getElementById(`improveBtn${idx}`);
+            const improvedEl = document.getElementById(`qaImproved${idx}`);
+            btn.disabled = true;
+            btn.textContent = '⏳ AI 분석 중...';
+
+            try {
+                const res = await fetch('/api/admin/improve-answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({
+                        question: item.question,
+                        answer: item.answer,
+                        category: item.category,
+                        keywords: item.keywords
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    // 개선된 답변 표시
+                    lastExtractedItems[idx].improved_answer = data.improved_answer;
+                    lastExtractedItems[idx].improved_keywords = data.improved_keywords;
+
+                    improvedEl.innerHTML = `<strong>✨ 개선된 답변:</strong><br>${escapeHtml(data.improved_answer)}`;
+                    improvedEl.classList.add('show');
+
+                    btn.textContent = '✅ 개선 완료';
+                    document.getElementById(`saveBtn${idx}`).style.display = 'inline-block';
+                } else {
+                    btn.textContent = '❌ 실패';
+                }
+            } catch (err) {
+                btn.textContent = '❌ 오류';
+                console.error(err);
+            }
+            setTimeout(() => { btn.disabled = false; btn.textContent = '✨ AI 개선'; }, 3000);
+        }
+
+        // 개선된 답변 저장
+        async function saveImprovedAnswer(idx) {
+            const item = lastExtractedItems[idx];
+            if (!item.improved_answer) return;
+
+            try {
+                const res = await fetch('/api/admin/learn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({
+                        message: `다음 Q&A를 정확하게 학습해:\n질문: ${item.question}\n답변: ${item.improved_answer}`,
+                        sessionId: learnSessionId
+                    })
+                });
+                const data = await res.json();
+
+                // UI 업데이트
+                const answerEl = document.getElementById(`qaAnswer${idx}`);
+                answerEl.textContent = item.improved_answer;
+
+                const keywordsEl = document.getElementById(`qaKeywords${idx}`);
+                if (item.improved_keywords && item.improved_keywords.length) {
+                    keywordsEl.innerHTML = item.improved_keywords.map(k => `<span>${escapeHtml(k)}</span>`).join('');
+                }
+
+                // 기존 답변 바꾸기
+                lastExtractedItems[idx].answer = item.improved_answer;
+                lastExtractedItems[idx].keywords = item.improved_keywords || item.keywords;
+
+                document.getElementById(`qaImproved${idx}`).classList.remove('show');
+                document.getElementById(`saveBtn${idx}`).style.display = 'none';
+
+                const saveBtn = document.getElementById(`saveBtn${idx}`);
+                loadLearnedData();
+            } catch (err) {
+                alert('저장 실패: ' + err.message);
+            }
+        }
 
         // 자동 로그인
         (async function autoLogin() {

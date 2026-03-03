@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infam Analysis - 프리미엄 판매 순위 대시보드</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="marketing-insight.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar/Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="ph ph-trend-up"></i>
+                <h2>Infam Analysis</h2>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <i class="ph ph-squares-four"></i>
+                    <span>대시보드</span>
+                </a>
+                <a href="#" class="nav-item" data-page="upload">
+                    <i class="ph ph-upload-simple"></i>
+                    <span>데이터 업로드</span>
+                </a>
+                <a href="#" class="nav-item" data-page="manual">
+                    <i class="ph ph-pencil-simple"></i>
+                    <span>데이터 직접입력</span>
+                </a>
+                <a href="#" class="nav-item" data-page="reels">
+                    <i class="ph ph-film-slate"></i>
+                    <span>릴스 대본</span>
+                </a>
+                <a href="#" class="nav-item" data-page="translator">
+                    <i class="ph ph-translate"></i>
+                    <span>번역기</span>
+                </a>
+                <a href="#" class="nav-item" data-page="report">
+                    <i class="ph ph-chart-bar"></i>
+                    <span>리포트</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1>대시보드 개요</h1>
+                    <p>실시간 판매 데이터 및 순위 분석</p>
+                </div>
+                <div class="header-actions">
+                    <button id="importDemoDataBtn" class="btn btn-secondary">
+                        <i class="ph ph-database"></i> 데모 데이터 로드
+                    </button>
+                    <!-- User Profile Mock -->
+                    <div class="user-profile">
+                        <div class="avatar">Admin</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-scroll">
+                <!-- AI Insight Section -->
+                <div style="
+                    background: #ffffff;
+                    border: 1px solid rgba(168, 85, 247, 0.2);
+                    border-top: 4px solid #a855f7;
+                    border-radius: 16px;
+                    padding: 1.75rem 2rem;
+                    margin-bottom: 2rem;
+                    position: relative;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+                ">
+                    <!-- 섹션 헤더 -->
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                        <h2
+                            style="color: #a855f7; font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <i class="ph ph-sparkle"></i> Gemini AI 최고 마케팅 전략 인사이트
+                        </h2>
+                        <button id="generateInsightBtn" class="btn" style="
+                            background: linear-gradient(135deg, #a855f7, #6366f1);
+                            color: white;
+                            border: none;
+                            font-size: 1rem;
+                            padding: 0.7rem 1.4rem;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                            font-weight: 600;
+                            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+                        ">
+                            <i class="ph ph-magic-wand"></i> 인사이트 도출
+                        </button>
+                    </div>
+                    <!-- 콘텐츠 박스 -->
+                    <div style="
+                        background: #f8fafc;
+                        border: 1px solid rgba(168, 85, 247, 0.15);
+                        border-radius: 12px;
+                        padding: 1.75rem 2rem;
+                        min-height: 140px;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 1.25rem;
+                    ">
+                        <i class="ph ph-robot"
+                            style="font-size: 3.5rem; color: #a855f7; flex-shrink: 0; margin-top: 2px;"></i>
+                        <div id="aiInsightText" style="flex: 1; color: #64748b; line-height: 1.9; font-size: 1.05rem;">
+                            업로드된 판매 데이터를 바탕으로 Gemini AI 검색엔진 알고리즘이 맞춤형 <strong style="color:#1e293b;">최고의 마케팅 전략
+                                인사이트</strong>를 스캔 및 도출 준비 중입니다.<br>
+                            먼저 우측 상단 <strong style="color:#a855f7;">「데모 데이터 로드」</strong> 버튼을 클릭하여 데이터를 불러온 후, 위의 <strong
+                                style="color:#a855f7;">「인사이트 도출」</strong> 버튼을 눌러보세요.
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <!-- Data Input Section (Forms & CSV) -->
+                <section class="section-card data-input-section">
+                    <div class="section-header">
+                        <h2><i class="ph ph-file-plus"></i> 데이터 입력</h2>
+                    </div>
+
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="csv-upload">파일 업로드 (Excel)</button>
+                        <button class="tab-btn" data-tab="manual-input">직접 입력</button>
+                    </div>
+
+                    <!-- CSV Upload Form -->
+                    <div id="csv-upload" class="tab-content active">
+                        <div class="upload-zone" id="uploadZone">
+                            <i class="ph ph-upload-simple upload-icon"></i>
+                            <p>Excel (.xlsx) 파일을 이곳으로 드래그하거나 클릭하여 업로드하세요</p>
+                            <input type="file" id="csvFileInput" accept=".xlsx, .xls, .csv" style="display: none;">
+                            <button class="btn btn-outline" onclick="document.getElementById('csvFileInput').click()">파일
+                                선택</button>
+                        </div>
+                    </div>
+
+                    <!-- Manual Input Form -->
+                    <div id="manual-input" class="tab-content" style="display: none;">
+                        <form id="addDataForm" class="data-form">
+                            <div class="form-group">
+                                <label for="productName">품목별 (제품명)</label>
+                                <input type="text" id="productName" required placeholder="예: 무늬목 도어">
+                            </div>
+                            <div class="form-group">
+                                <label for="spec">규격</label>
+                                <input type="text" id="spec" required placeholder="예: 200*100">
+                            </div>
+                            <div class="form-group">
+                                <label for="colorName">색상</label>
+                                <input type="text" id="colorName" placeholder="예: 화이트, 네이비, 그레이">
+                            </div>
+                            <div class="form-group">
+                                <label for="salesVolume">수량</label>
+                                <input type="number" id="salesVolume" required min="1" placeholder="예: 150">
+                            </div>
+                            <div class="form-group">
+                                <label for="supplyPrice">공급가액 (원)</label>
+                                <input type="number" id="supplyPrice" required min="0" placeholder="예: 500000">
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">데이터 추가</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+
+
+                <div class="dashboard-grid">
+                    <!-- Statistics/Highlights -->
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <div class="stat-icon sales-icon"><i class="ph ph-currency-krw"></i></div>
+                            <div class="stat-info">
+                                <h3>총 매출 합계액</h3>
+                                <p id="totalSalesWidget">0</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon product-icon"><i class="ph ph-package"></i></div>
+                            <div class="stat-info">
+                                <h3>최고 판매 품목 (매출 기준)</h3>
+                                <p id="topProductWidget">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <section class="section-card chart-section">
+                        <div class="section-header">
+                            <h2><i class="ph ph-chart-pie-slice"></i> 매출 합계 점유율</h2>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="salesChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Color Chart Section -->
+                <section class="section-card color-chart-section">
+                    <div class="section-header">
+                        <h2><i class="ph ph-palette"></i> 색상별 판매 순위</h2>
+                        <div class="color-filter-wrap">
+                            <select id="colorProductFilter" class="form-select" style="min-width:160px;">
+                                <option value="all">전체 제품</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="color-charts-grid">
+                        <div class="color-chart-box">
+                            <h3 class="color-chart-title">색상별 수량 점유율</h3>
+                            <div class="color-chart-container">
+                                <canvas id="colorVolumeChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="color-chart-box">
+                            <h3 class="color-chart-title">색상별 매출 점유율</h3>
+                            <div class="color-chart-container">
+                                <canvas id="colorRevenueChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="colorRankingList" class="color-ranking-list"></div>
+                </section>
+
+                <!-- Ranking List Section -->
+                <section class="section-card ranking-section">
+                    <div class="section-header">
+                        <h2><i class="ph ph-list-numbers"></i> 품목별 판매 순위</h2>
+                        <!-- Sorting Options -->
+                        <div class="sort-controls">
+                            <select id="sortSelect" class="form-select">
+                                <option value="total">매출 합계 순</option>
+                                <option value="volume">판매 수량 순</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="ranking-table">
+                            <thead>
+                                <tr>
+                                    <th>순위</th>
+                                    <th>품목별</th>
+                                    <th>규격</th>
+                                    <th>수량</th>
+                                    <th>공급가액</th>
+                                    <th>부가세</th>
+                                    <th>합계</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankingTableBody">
+                                <!-- Data will be injected here via JS -->
+                                <tr>
+                                    <td colspan="7" class="empty-state">데이터가 없습니다. 엑셀 파일을 업로드하거나 데모를 로드하세요.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==============================
+                 릴스 대본 페이지 (독립)
+            ============================== -->
+            <div id="page-reels" class="page-section" style="display:none;">
+                <!-- 페이지 헤더 -->
+                <div class="reels-page-header">
+                    <div>
+                        <span class="reels-badge"><i class="ph ph-film-slate"></i> Instagram Reels</span>
+                        <h1 class="reels-page-title"><i class="ph ph-video-camera"></i> 릴스 대본 생성기</h1>
+                        <p class="reels-page-desc">@interior__family 인기 릴스 패턴을 분석해<br>
+                            <strong>7가지 바이럴 포맷</strong>으로 최적화된 대본을 자동 생성합니다.
+                        </p>
+                    </div>
+                    <div class="reels-page-actions">
+                        <!-- 타겟 오디언스 선택 -->
+                        <div class="audience-toggle-wrap">
+                            <span class="audience-label">타겟:</span>
+                            <div class="audience-toggle" id="audienceToggle">
+                                <button class="audience-btn active" data-audience="consumer"><i class="ph ph-house"></i>
+                                    소비자</button>
+                                <button class="audience-btn" data-audience="business"><i class="ph ph-buildings"></i>
+                                    사업자</button>
+                            </div>
+                        </div>
+                        <button id="generateReelsBtn" class="btn reels-generate-btn">
+                            <i class="ph ph-sparkle"></i> 대본 생성
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 대본 포맷 탭 (5가지) -->
+                <div class="reels-format-tabs-bar">
+                    <div class="reels-format-tabs" id="reelsFormatTabs">
+                        <button class="reels-tab active" data-format="problem">🎯 문제제시→해결</button>
+                        <button class="reels-tab" data-format="before">✨ Before→After</button>
+                        <button class="reels-tab" data-format="construction">🏗️ 8초 시공일지</button>
+                        <button class="reels-tab" data-format="expert">💡 전문가 팁</button>
+                        <button class="reels-tab" data-format="newmaterial">📢 신자재 소개</button>
+                        <button class="reels-tab" data-format="experiment">🔬 실험검증</button>
+                        <button class="reels-tab" data-format="qna">💬 무물Q&A</button>
+                    </div>
+                </div>
+
+                <!-- 자재 지식 뱃지 바 -->
+                <div class="material-knowledge-bar">
+                    <span class="material-tag wpc">💡 WPC — 초경량·공사 없이 시공</span>
+                    <span class="material-tag spc">🚿 SPC — 방수·욕실벽 최적화</span>
+                    <span class="material-tag soft">🔥 소프트스톤 — 내열·곡면벽 가능</span>
+                    <span class="material-tag carving">✨ 카빙스톤 — 럭셔리 포인트벽</span>
+                    <span class="material-tag metal">🏗️ 메탈패널 — 곡면·산업시공</span>
+                </div>
+
+                <!-- 인기 릴스 참고 라이브러리 -->
+                <div class="viral-library-section">
+                    <div class="viral-library-header">
+                        <h3><i class="ph ph-fire"></i> @interior__family 인기 쇼츠/릴스 패턴 분석 (10개)</h3>
+                        <button class="viral-library-toggle" id="viralLibraryToggle">
+                            <i class="ph ph-caret-down"></i>
+                        </button>
+                    </div>
+                    <div class="viral-library-grid" id="viralLibraryGrid">
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">🔥 최고 조회수 ~1.2만</div>
+                            <h4>🔬 반전 수치 훅 — 충격 비교</h4>
+                            <p>"3M 돌이 단 5kg?!" "6배 가벼운 소프트스톤" — 크기 vs 무게 괴리를 이용한 충격 훅</p>
+                            <div class="viral-tags"><span>충격수치</span><span>쇼츠최고</span><span>높은 공유율</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">🔥 최고 조회수 ~1.2만</div>
+                            <h4>🔬 실험 검증형 — 직접 증명</h4>
+                            <p>불 붙이기(방염), 휘어보기(유연성), 칼로 자르기(편의성) — 시각적 증명으로 높은 완주율</p>
+                            <div class="viral-tags"><span>실험형</span><span>시각증명</span><span>높은 완주율</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">🔥 높은 조회수 ~1.1만</div>
+                            <h4>💬 무물 Q&A 시리즈</h4>
+                            <p>"스타스톤 시공법" 등 구독자 질문에 답변하는 형식으로 신뢰도 구축</p>
+                            <div class="viral-tags"><span>Q&A</span><span>신뢰구축</span><span>팔로우유도</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">🔥 높은 조회수 ~1만</div>
+                            <h4>🔎 정체 공개형 — "~의 비밀"</h4>
+                            <p>"곡면 시공도 끄떡없는 자재의 비밀" — 호기심 자극 제목으로 끝까지 시청 유도</p>
+                            <div class="viral-tags"><span>호기심</span><span>비밀공개</span><span>높은 저장률</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">🔥 높은 조회수 ~1만</div>
+                            <h4>✂️ DIY 재단 시연</h4>
+                            <p>"커터칼로 재단 가능한 대리석 패널의 정체" — 셀프 시공 가능성 시연으로 소비자 접근성 강화</p>
+                            <div class="viral-tags"><span>DIY</span><span>셀프시공</span><span>접근성</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">🔥 높은 조회수</div>
+                            <h4>통념 깨기 / 전문가 포지셔닝</h4>
+                            <p>"자재 탓 하지 마세요" — 고정관념 반박으로 시작, 전문 지식 전달로 권위 확보</p>
+                            <div class="viral-tags"><span>교육형</span><span>전문가</span><span>높은 공유율</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">📈 높은 조회수</div>
+                            <h4>🏗️ 8초 시공일지 시리즈</h4>
+                            <p>빠른 시공 몽타주 → 만족스러운 완성 결과물. 짧고 임팩트 있는 포맷</p>
+                            <div class="viral-tags"><span>만족감</span><span>시각적</span><span>높은 완주율</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">📈 안정적 조회수</div>
+                            <h4>✨ Before → After 변환</h4>
+                            <p>시공 전/후 극적 비교. "같은 공간 맞나요?" 반응 유도로 댓글 폭발</p>
+                            <div class="viral-tags"><span>극적비교</span><span>소비자</span><span>높은 댓글률</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">📈 안정적 조회수</div>
+                            <h4>📢 신자재 소개 — "이런 자재가?"</h4>
+                            <p>빛 투과 돌, 메탈패널 곡면 시공 등 혁신 자재의 놀라운 특성 시연</p>
+                            <div class="viral-tags"><span>호기심</span><span>혁신</span><span>높은 저장률</span></div>
+                        </div>
+                        <div class="viral-pattern-card">
+                            <div class="viral-score">📈 안정적 조회수</div>
+                            <h4>💬 댓글 유도 CTA 전략</h4>
+                            <p>"팔로우+댓글로 카다로그 받기" — 리드 생성과 알고리즘 부스팅 동시 달성</p>
+                            <div class="viral-tags"><span>리드생성</span><span>참여유도</span><span>알고리즘</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 대본 카드 컨테이너 -->
+                <div id="reelsScriptContainer" class="reels-card-grid">
+                    <div class="reels-placeholder">
+                        <i class="ph ph-video-camera" style="font-size:3rem;color:rgba(236,72,153,0.4);"></i>
+                        <p>데이터를 로드한 후 <strong>「대본 생성」</strong> 버튼을 눌러<br>판매 상위 제품의 릴스 대본을 확인하세요.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==============================
+                 번역기 페이지 (독립)
+            ============================== -->
+            <div id="page-translator" class="page-section" style="display:none;">
+                <!-- 페이지 헤더 -->
+                <div class="translator-page-header">
+                    <div>
+                        <span class="translator-badge"><i class="ph ph-translate"></i> Translation Dashboard</span>
+                        <h1 class="translator-page-title"><i class="ph ph-globe"></i> 제조 요청 번역기</h1>
+                        <p class="translator-page-desc">제조 요청서를 <strong>중국어, 영어, 한국어</strong> 3개 국어로 자동 변환합니다.<br>
+                            전체 복사 버튼으로 한 번에 복사하세요.</p>
+                    </div>
+                </div>
+
+                <!-- 입력 영역 -->
+                <div class="translator-input-section">
+                    <div class="translator-input-header">
+                        <h2><i class="ph ph-pencil-simple"></i> 번역할 제조 요청 내용</h2>
+                    </div>
+                    <textarea id="translatorInput" class="translator-textarea" rows="5" placeholder="번역할 제조 요청 내용을 입력하세요...
+
+예시: 소프트스톤 SS-01 화이트 600x600mm 200장 제조 요청합니다. 납기일은 2월 28일까지이며, 포장은 개별 포장으로 해주세요."></textarea>
+                    <div class="translator-actions">
+                        <button id="translateBtn" class="btn translator-translate-btn">
+                            <i class="ph ph-translate"></i> 번역 실행
+                        </button>
+                        <button id="translateSampleBtn" class="btn btn-secondary">
+                            <i class="ph ph-flask"></i> 샘플 데이터 로드
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 번역 결과 영역 -->
+                <div id="translatorCards" class="translator-result-wrap">
+                    <div class="translator-placeholder">
+                        <i class="ph ph-translate" style="font-size:3rem;color:rgba(56,189,248,0.4);"></i>
+                        <p>위에 제조 요청 내용을 입력한 후 <strong>「번역 실행」</strong> 버튼을 눌러<br>중국어, 영어, 한국어 번역 결과를 확인하세요.</p>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="marketing-insight.js"></script>
+</body>
+
+</html>

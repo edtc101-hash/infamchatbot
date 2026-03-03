@@ -16,6 +16,7 @@ try { require('dotenv').config(); } catch { /* dotenv 미설치 시 무시 */ }
 // 업로드 설정
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 const { setApiKey, buildVectorStore, ragSearch, getRAGStatus } = require('./rag/rag-pipeline');
+const igGraphApi = require('./ig-graph-api');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,11 +36,13 @@ if (!GEMINI_API_KEY) {
     process.exit(1);
 }
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' }); // 채팅용 (최신 추론 모델)
-const visionModel = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' }); // 시각 분석용
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' }); // 채팅/학습용 (안정 모델)
+const flashModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // 빠른 분석용 (폴백)
+const visionModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // 시각 분석용
 
 // Nano Banana 2 (Gemini 3.1 Flash Image — 최신 이미지 생성)
-const genAINB = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const GEMINI_IMAGE_API_KEY = process.env.GEMINI_IMAGE_API_KEY || GEMINI_API_KEY;
+const genAINB = new GoogleGenAI({ apiKey: GEMINI_IMAGE_API_KEY });
 const IMAGE_GEN_MODEL = 'gemini-3.1-flash-image-preview'; // Nano Banana 2
 const IMAGE_GEN_FALLBACK = 'gemini-3-pro-image-preview'; // Nano Banana 1 (fallback)
 
@@ -1093,11 +1096,62 @@ ${conversation}
         res.json({
             response: aiResponse,
             learnedCount: learnedItems.length,
-            learnedItems: learnedItems.map(i => ({ question: i.question, category: i.category }))
+            learnedItems: learnedItems.map(i => ({ question: i.question, answer: i.answer, category: i.category, keywords: i.keywords || [] }))
         });
     } catch (error) {
         console.error('대화 분석 AI 호출 오류:', error);
         res.status(500).json({ error: 'AI 분석에 실패했습니다.', detail: error.message });
+    }
+});
+
+// AI로 답변 개선하기
+app.post('/api/admin/improve-answer', adminAuth, async (req, res) => {
+    const { question, answer, category, keywords } = req.body;
+    if (!question || !answer) {
+        return res.status(400).json({ error: 'question과 answer는 필수입니다.' });
+    }
+    try {
+        const improvePrompt = `너는 인팸(InteriorFamily) 벽장재 전문 회사의 시니어 기술 전문가야.
+아래 Q&A의 답변을 검토하고, **더 정확하고 전문적이며 고객에게 도움이 되는 답변**으로 개선해.
+
+=== 기존 Q&A ===
+카테고리: ${category || '기타'}
+질문: ${question}
+현재 답변: ${answer}
+키워드: ${(keywords || []).join(', ')}
+=== 끝 ===
+
+📋 개선 지침:
+1. 기존 답변의 핵심 내용은 유지하되, 더 정확하고 구체적으로 보완해.
+2. 숫자, 수치, 규격 등 구체적 데이터가 있으면 반드시 포함해.
+3. 실무에서 자주 발생하는 주의사항이나 팁이 있으면 추가해.
+4. 문장을 자연스럽고 친절하게 다듬어.
+5. 문서에 없는 내용은 지어내지 마.
+
+✅ 출력 형식 — 오직 JSON만 출력해:
+{"improved_answer": "개선된 답변 내용", "improved_keywords": ["보완된 키워드1", "키워드2"]}`;
+
+        const result = await model.generateContent(improvePrompt);
+        let aiText = result.response.text();
+
+        // JSON 추출
+        let jsonStr = aiText;
+        if (aiText.includes('```json')) {
+            jsonStr = aiText.split('```json')[1].split('```')[0].trim();
+        } else if (aiText.includes('```')) {
+            jsonStr = aiText.split('```')[1].split('```')[0].trim();
+        }
+        const improved = JSON.parse(jsonStr);
+
+        console.log(`✅ AI 답변 개선 완료: "${question.substring(0, 30)}..."`);
+        res.json({
+            success: true,
+            improved_answer: improved.improved_answer || answer,
+            improved_keywords: improved.improved_keywords || keywords
+        });
+    } catch (error) {
+        console.error('AI 답변 개선 오류:', error);
+        res.status(500).json({ error: 'AI 답변 개선에 실패했습니다.', detail: error.message });
     }
 });
 
@@ -1163,7 +1217,7 @@ app.post('/api/admin/upload-knowledge', adminAuth, upload.array('documents'), as
         const startTime = Date.now();
 
         // ─── 2단계: Gemini Flash로 병렬 Q&A 추출 (3개 동시) ───
-        const flashModel = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' }); // Flash = 5~10x 빠름
+        // flashModel은 전역 변수 (gemini-2.5-flash) 사용
         const CONCURRENCY = 3; // 동시 처리 수
 
         async function processChunk(chunk, index) {
@@ -1542,7 +1596,7 @@ app.post('/api/design/analyze', upload.single('file'), async (req, res) => {
 
         console.log(`🎨 디자인 분석 요청: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)}KB)`);
 
-        const analyzeModel = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
+        const analyzeModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
         const prompt = `당신은 전문 디자인 분석가입니다. 업로드된 이미지/문서에서 디자인 톤앤매너를 분석해주세요.
 
@@ -1690,9 +1744,9 @@ ${contextInfo}
                 }
             }
         } catch (nbErr) {
-            console.warn('⚠️ Nano Banana 실패, gemini-3.1-pro-preview로 펴백:', nbErr.message);
-            // 펴백: gemini-3.1-pro-preview
-            const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
+            console.warn('⚠️ Nano Banana 실패, gemini-2.5-pro로 폴백:', nbErr.message);
+            // 폴백: gemini-2.5-pro
+            const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
             const fallbackParts = contentParts;
             const fallbackResult = await fallbackModel.generateContent(fallbackParts);
             responseText = fallbackResult.response.text();
@@ -1780,7 +1834,7 @@ app.post('/api/design/generate', async (req, res) => {
         const { preset, analysis, parameters } = req.body;
         console.log(`🎨 디자인 생성 요청: ${preset}`);
 
-        const designModel = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
+        const designModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
         let contextInfo = '';
         if (analysis) {
@@ -2503,8 +2557,31 @@ app.get('/api/erp/summary', async (req, res) => {
         let totalInventoryQty = 0;
         let totalInventoryAmt = 0;
         let lowStockItems = [];
-        const inventoryItems = extractEcountData(inventoryResult);
-        console.log(`📊 재고 데이터: ${inventoryItems.length}건`);
+        let inventoryItems = extractEcountData(inventoryResult);
+        let salesItems = extractEcountData(salesResult);
+        let purchaseItems = extractEcountData(purchasesResult);
+        console.log(`📊 API 결과 — 재고: ${inventoryItems.length}건, 매출: ${salesItems.length}건, 매입: ${purchaseItems.length}건`);
+
+        // API 데이터가 모두 비어있으면 스크랩 데이터 사용
+        if (inventoryItems.length === 0 && salesItems.length === 0 && purchaseItems.length === 0) {
+            console.log('📂 API 데이터 비었음 → 스크랩 데이터 사용');
+            try {
+                const scraped = JSON.parse(fs.readFileSync(path.join(__dirname, 'erp-scraped-data.json'), 'utf8'));
+                const salesAmt = scraped.summary?.totalSalesAmt || scraped.sales.reduce((s, i) => s + (i.amount || 0), 0);
+                const purchaseAmt = scraped.summary?.totalPurchaseAmt || scraped.purchases.reduce((s, i) => s + (i.amount || 0), 0);
+                const invQty = scraped.summary?.totalInventoryQty || scraped.inventory.reduce((s, i) => s + (i.qty || 0), 0);
+                const lowStock = scraped.inventory.filter(i => i.qty > 0 && i.qty <= 10);
+                return res.json({
+                    success: true, source: 'scraped',
+                    period: scraped.period,
+                    inventory: { totalQty: invQty, totalAmt: 0, itemCount: scraped.inventory.length, lowStockItems: lowStock, raw: scraped.inventory },
+                    sales: { totalAmt: salesAmt, count: scraped.sales.length, raw: scraped.sales },
+                    purchases: { totalAmt: purchaseAmt, count: scraped.purchases.length, raw: scraped.purchases },
+                    updatedAt: scraped.scrapedAt,
+                });
+            } catch (e) { console.log('⚠️ 스크랩 데이터 파일 없음'); }
+        }
+
         inventoryItems.forEach(item => {
             const qty = parseFloat(item.BAL_QTY || item.QUANTITY || item.QTY || 0);
             const amt = parseFloat(item.BAL_AMT || item.AMOUNT || item.AMT || 0);
@@ -2521,20 +2598,14 @@ app.get('/api/erp/summary', async (req, res) => {
 
         // 매출 요약
         let totalSalesAmt = 0;
-        let salesCount = 0;
-        const salesItems = extractEcountData(salesResult);
-        console.log(`📊 매출 데이터: ${salesItems.length}건`);
-        salesCount = salesItems.length;
+        let salesCount = salesItems.length;
         salesItems.forEach(item => {
             totalSalesAmt += parseFloat(item.SUPPLY_AMT || item.AMOUNT || item.TOT_AMT || 0);
         });
 
         // 매입 요약
         let totalPurchasesAmt = 0;
-        let purchasesCount = 0;
-        const purchaseItems = extractEcountData(purchasesResult);
-        console.log(`📊 매입 데이터: ${purchaseItems.length}건`);
-        purchasesCount = purchaseItems.length;
+        let purchasesCount = purchaseItems.length;
         purchaseItems.forEach(item => {
             totalPurchasesAmt += parseFloat(item.SUPPLY_AMT || item.AMOUNT || item.TOT_AMT || 0);
         });
@@ -2563,7 +2634,34 @@ app.get('/api/erp/summary', async (req, res) => {
         });
     } catch (err) {
         console.error('❌ ERP 종합 요약 오류:', err.message);
-        res.status(500).json({ error: err.message });
+        // Fallback to scraped data
+        try {
+            const scraped = JSON.parse(fs.readFileSync(path.join(__dirname, 'erp-scraped-data.json'), 'utf8'));
+            const salesAmt = scraped.summary?.totalSalesAmt || scraped.sales.reduce((s, i) => s + (i.amount || 0), 0);
+            const purchaseAmt = scraped.summary?.totalPurchaseAmt || scraped.purchases.reduce((s, i) => s + (i.amount || 0), 0);
+            const invQty = scraped.summary?.totalInventoryQty || scraped.inventory.reduce((s, i) => s + (i.qty || 0), 0);
+            const lowStock = scraped.inventory.filter(i => i.qty > 0 && i.qty <= 10);
+            res.json({
+                success: true, source: 'scraped',
+                period: scraped.period,
+                inventory: { totalQty: invQty, totalAmt: 0, itemCount: scraped.inventory.length, lowStockItems: lowStock, raw: scraped.inventory },
+                sales: { totalAmt: salesAmt, count: scraped.sales.length, raw: scraped.sales },
+                purchases: { totalAmt: purchaseAmt, count: scraped.purchases.length, raw: scraped.purchases },
+                updatedAt: scraped.scrapedAt,
+            });
+        } catch (e2) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+});
+
+// 스크랩된 데이터 직접 제공
+app.get('/api/erp/scraped', (req, res) => {
+    try {
+        const scraped = JSON.parse(fs.readFileSync(path.join(__dirname, 'erp-scraped-data.json'), 'utf8'));
+        res.json({ success: true, ...scraped });
+    } catch (e) {
+        res.status(404).json({ error: '스크랩된 데이터가 없습니다.' });
     }
 });
 
@@ -2575,6 +2673,247 @@ app.get('/api/erp/status', (req, res) => {
         lastLogin: ecountSession.lastLogin ? new Date(ecountSession.lastLogin).toISOString() : null,
         configured: !!(ECOUNT_COM_CODE && ECOUNT_USER_ID && ECOUNT_API_CERT_KEY),
     });
+});
+
+// ========================
+// AI 이미지 최적화 (Nano Banana 2 — Gemini 3.1 Flash Image)
+// ========================
+app.post('/api/ai/enhance', async (req, res) => {
+    try {
+        const { image, mode } = req.body;
+        if (!image) return res.status(400).json({ success: false, message: '이미지가 필요합니다.' });
+
+        // base64 데이터 추출 (JPEG만 사용 — Gemini 이미지 모델 요구사항)
+        let base64Data;
+        const base64Match = image.match(/^data:image\/\w+;base64,(.+)$/);
+        if (!base64Match) return res.status(400).json({ success: false, message: '올바른 이미지 형식이 아닙니다.' });
+        base64Data = base64Match[1];
+
+        // 최적화 프롬프트 (professional 전문 보정)
+        const prompt = mode === 'professional'
+            ? 'Enhance this image to professional commercial photography quality. Improve lighting naturally, optimize color temperature, increase sharpness and clarity, reduce noise, enhance details. Keep the original composition and content exactly the same. Output a high-quality enhanced version.'
+            : 'Enhance this image quality: improve brightness, contrast, color saturation, sharpness. Remove noise. Keep original composition and content unchanged. Output enhanced image.';
+
+        console.log(`🎨 AI 이미지 최적화 시작 (모드: ${mode || 'auto'}, 키: ${GEMINI_IMAGE_API_KEY ? '설정됨' : '미설정'})`);
+
+        // @google/genai SDK로 이미지 편집
+        let result = null;
+        const modelList = [IMAGE_GEN_MODEL, IMAGE_GEN_FALLBACK];
+
+        for (const modelName of modelList) {
+            try {
+                console.log(`  → 시도: ${modelName}`);
+                const response = await genAINB.models.generateContent({
+                    model: modelName,
+                    contents: [
+                        {
+                            role: 'user',
+                            parts: [
+                                {
+                                    inlineData: {
+                                        mimeType: 'image/jpeg',
+                                        data: base64Data
+                                    }
+                                },
+                                { text: prompt }
+                            ]
+                        }
+                    ],
+                    config: {
+                        responseModalities: ['Text', 'Image'],
+                    }
+                });
+
+                console.log(`  → 응답 수신, candidates: ${response.candidates?.length || 0}`);
+
+                // 응답에서 이미지 부분 추출
+                if (response?.candidates?.[0]?.content?.parts) {
+                    for (const part of response.candidates[0].content.parts) {
+                        if (part.inlineData?.data) {
+                            result = {
+                                mimeType: part.inlineData.mimeType || 'image/jpeg',
+                                data: part.inlineData.data
+                            };
+                            console.log(`  ✅ 이미지 추출 성공 (${modelName})`);
+                            break;
+                        }
+                    }
+                }
+
+                if (result) break;
+                console.log(`  ⚠️ ${modelName}: 이미지 파트 없음`);
+
+            } catch (modelErr) {
+                console.error(`  ❌ ${modelName} 실패:`, modelErr.message);
+            }
+        }
+
+        if (!result) {
+            return res.status(500).json({
+                success: false,
+                message: 'AI 이미지 최적화에 실패했습니다. 이미지 모델이 아직 지원되지 않거나 API 한도를 초과했을 수 있습니다.'
+            });
+        }
+
+        res.json({
+            success: true,
+            image: `data:${result.mimeType};base64,${result.data}`,
+            model: 'Nano Banana 2'
+        });
+
+    } catch (e) {
+        console.error('❌ AI 최적화 오류:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ========================
+// Instagram Graph API 엔드포인트
+// ========================
+
+// 계정 정보 조회
+app.get('/api/ig/account', async (req, res) => {
+    try {
+        const info = await igGraphApi.getAccountInfo();
+        res.json(info);
+    } catch (e) {
+        res.status(500).json({ connected: false, message: e.message });
+    }
+});
+
+// 즉시 게시
+app.post('/api/ig/publish', async (req, res) => {
+    try {
+        const { image, caption } = req.body;
+        if (!image) return res.status(400).json({ success: false, message: '이미지가 필요합니다.' });
+        const result = await igGraphApi.publishImage(image, caption);
+        res.json(result);
+    } catch (e) {
+        console.error('❌ Instagram 게시 실패:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// 예약 게시
+app.post('/api/ig/schedule', async (req, res) => {
+    try {
+        const { image, caption, scheduledAt } = req.body;
+        if (!image || !scheduledAt) return res.status(400).json({ success: false, message: '이미지와 예약 시간이 필요합니다.' });
+        const result = await igGraphApi.scheduleImage(image, caption, scheduledAt);
+        res.json(result);
+    } catch (e) {
+        console.error('❌ Instagram 예약 실패:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ========================
+// AI 이미지 최적화 API (Nano Banana 2)
+// ========================
+app.post('/api/ai/enhance', async (req, res) => {
+    const { image, mode } = req.body;
+    if (!image) return res.status(400).json({ success: false, message: '이미지가 필요합니다.' });
+
+    try {
+        // base64 데이터 추출 (data:image/jpeg;base64,... 형식 처리)
+        const base64Match = image.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
+        if (!base64Match) throw new Error('유효하지 않은 이미지 형식입니다.');
+
+        const mimeType = `image/${base64Match[1]}`;
+        const base64Data = base64Match[2];
+
+        console.log(`🤖 AI 이미지 최적화 요청 (모드: ${mode || 'professional'})`);
+
+        const prompt = mode === '4k-upscale'
+            ? `이 이미지를 4K 해상도(3840x2160 이상)로 업스케일해주세요:
+- 초고해상도 업스케일링: 픽셀을 보간하여 4K 수준의 선명한 디테일 생성
+- 텍스처 복원: 업스케일 과정에서 손실되는 텍스처를 AI로 복원
+- 노이즈 제거: 업스케일 시 발생하는 아티팩트 제거
+- 엣지 선명도: 경계선을 자연스럽고 선명하게 처리
+- 인테리어 제품 사진에 최적화된 전문적인 품질로 출력
+원본 이미지의 구조와 색상을 유지하면서 해상도만 극대화해주세요.`
+            : `이 이미지를 최고 품질로 향상시켜주세요:
+- 고해상도 업스케일링: 세부 텍스처와 선명도 극대화
+- 색상 보정: 자연스럽고 생동감 있는 색상, 화이트 밸런스 최적화
+- 선명도 향상: 엣지 및 디테일 강조
+- 노이즈 제거: 깔끔하고 선명한 결과물
+- 인테리어 제품 사진에 최적화된 전문적인 품질로 출력
+원본 이미지의 구조와 내용을 유지하면서 품질만 향상시켜주세요.`;
+
+        // Nano Banana 2 (gemini-3.1-flash-image-preview) 시도
+        let resultImage = null;
+        let usedModel = IMAGE_GEN_MODEL;
+
+        for (const modelName of [IMAGE_GEN_MODEL, IMAGE_GEN_FALLBACK]) {
+            try {
+                const result = await genAINB.models.generateContent({
+                    model: modelName,
+                    contents: [{
+                        role: 'user',
+                        parts: [
+                            {
+                                inlineData: {
+                                    mimeType: mimeType,
+                                    data: base64Data
+                                }
+                            },
+                            { text: prompt }
+                        ]
+                    }],
+                    config: {
+                        responseModalities: ['IMAGE', 'TEXT'],
+                        temperature: 0.2
+                    }
+                });
+
+                // 응답에서 이미지 추출
+                if (result.candidates && result.candidates[0]) {
+                    const parts = result.candidates[0].content.parts;
+                    for (const part of parts) {
+                        if (part.inlineData && part.inlineData.data) {
+                            resultImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                            usedModel = modelName;
+                            break;
+                        }
+                    }
+                }
+
+                if (resultImage) {
+                    console.log(`✅ AI 이미지 최적화 성공 (모델: ${usedModel})`);
+                    break;
+                }
+            } catch (modelErr) {
+                console.log(`⚠️ 모델 ${modelName} 실패:`, modelErr.message);
+                if (modelName === IMAGE_GEN_FALLBACK) throw modelErr;
+            }
+        }
+
+        if (!resultImage) {
+            throw new Error('이미지 생성 결과를 받지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        }
+
+        return res.json({
+            success: true,
+            image: resultImage,
+            model: usedModel,
+            message: 'AI 최적화 완료'
+        });
+
+    } catch (err) {
+        console.error('❌ AI 이미지 최적화 오류:', err.message);
+
+        // API 키 문제나 모델 없음 오류인 경우 더 명확한 메시지
+        let userMessage = err.message;
+        if (err.message.includes('API_KEY') || err.message.includes('401')) {
+            userMessage = 'API 키 오류입니다. 서버 환경변수를 확인해 주세요.';
+        } else if (err.message.includes('404') || err.message.includes('not found')) {
+            userMessage = '이미지 생성 모델을 사용할 수 없습니다. API 키 권한을 확인해 주세요.';
+        } else if (err.message.includes('429')) {
+            userMessage = 'API 호출 한도 초과입니다. 잠시 후 다시 시도해 주세요.';
+        }
+
+        return res.status(500).json({ success: false, message: userMessage });
+    }
 });
 
 app.listen(PORT, async () => {

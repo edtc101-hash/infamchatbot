@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>할부지 편집기 | InFam</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/image-editor.css">
+</head>
+
+<body>
+    <header class="editor-header">
+        <div class="header-left">
+            <div class="header-logo">
+                <img src="/infam-logo.svg" alt="InFam"
+                    onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                <span class="logo-fallback"
+                    style="display:none;width:36px;height:36px;background:#f97316;border-radius:10px;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;">if</span>
+            </div>
+            <div>
+                <h1>InFam. <span class="header-sub">할부지 편집기</span></h1>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="btn-download" onclick="downloadImage()">📥 현재 이미지</button>
+            <button class="btn-download btn-download-all" onclick="downloadAll()">📦 전체 다운로드</button>
+        </div>
+    </header>
+
+    <div class="editor-layout">
+        <aside class="sidebar" id="sidebar">
+            <!-- 이미지 업로드 (다중) -->
+            <div class="sidebar-section">
+                <h3 class="section-title">📷 이미지 업로드</h3>
+                <div class="upload-zone" id="imageUploadZone">
+                    <div class="upload-placeholder" id="uploadPlaceholder">
+                        <span class="upload-icon">🖼️</span>
+                        <p>클릭 또는 드래그하여 업로드</p>
+                        <p class="upload-sub">여러 장 동시 업로드 가능</p>
+                    </div>
+                    <input type="file" id="imageInput" accept="image/*" multiple
+                        onchange="handleMultiUpload(this.files)">
+                </div>
+                <div class="image-gallery" id="imageGallery"></div>
+            </div>
+
+            <!-- 프레임 설정 -->
+            <div class="sidebar-section">
+                <h3 class="section-title">🖼️ 프레임 설정</h3>
+                <div class="frame-presets" id="framePresets">
+                    <button class="frame-btn" onclick="setFrame(9,16)" data-ratio="9:16">
+                        <div class="frame-icon" style="width:18px;height:32px"></div><span>9:16</span>
+                    </button>
+                    <button class="frame-btn" onclick="setFrame(3,4)" data-ratio="3:4">
+                        <div class="frame-icon" style="width:24px;height:32px"></div><span>3:4</span>
+                    </button>
+                    <button class="frame-btn active" onclick="setFrame(1,1)" data-ratio="1:1">
+                        <div class="frame-icon" style="width:28px;height:28px"></div><span>1:1</span>
+                    </button>
+                    <button class="frame-btn" onclick="setFrame(4,3)" data-ratio="4:3">
+                        <div class="frame-icon" style="width:32px;height:24px"></div><span>4:3</span>
+                    </button>
+                    <button class="frame-btn" onclick="setFrame(16,9)" data-ratio="16:9">
+                        <div class="frame-icon" style="width:32px;height:18px"></div><span>16:9</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 이미지 조절 -->
+            <div class="sidebar-section" id="adjustSection" style="display:none">
+                <h3 class="section-title">🔍 이미지 조절</h3>
+                <div class="slider-group">
+                    <label>확대/축소 <span id="zoomVal">100</span>%</label>
+                    <input type="range" min="10" max="500" value="100" id="zoomSlider" oninput="updateZoom()">
+                </div>
+                <p class="hint">💡 마우스 휠로 확대/축소 · 드래그로 위치 이동</p>
+                <button class="btn-action btn-secondary" onclick="resetTransform()" style="margin-top:8px">🔄 위치
+                    초기화</button>
+            </div>
+
+            <!-- AI 4K 스케일 업 -->
+            <div class="sidebar-section ai-section" id="aiSection" style="display:none">
+                <h3 class="section-title">🚀 AI 4K 스케일 업 <span class="ai-badge">NANO BANANA</span></h3>
+                <p class="hint" style="margin-bottom:10px">AI가 이미지를 4K 해상도로 업스케일합니다</p>
+                <button class="btn-action btn-ai-optimize" id="aiOptimizeBtn" onclick="ai4KUpscale()">
+                    🚀 4K 스케일 업
+                </button>
+                <div class="ai-progress" id="aiProgress" style="display:none">
+                    <div class="ai-progress-bar">
+                        <div class="ai-progress-fill"></div>
+                    </div>
+                    <p class="ai-progress-text" id="aiProgressText">AI 업스케일 중...</p>
+                </div>
+                <p class="ai-result-msg" id="aiResultMsg"></p>
+            </div>
+
+            <!-- 로고 & 워터마크 (자동) -->
+            <div class="sidebar-section">
+                <h3 class="section-title">🏷️ 로고 & 워터마크</h3>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="showLogo" checked onchange="renderCanvas()">
+                    <label for="showLogo">InFam 로고 표시</label>
+                </div>
+                <div class="slider-group">
+                    <label>로고 크기 <span id="logoSizeVal">60</span>px</label>
+                    <input type="range" min="20" max="200" value="60" id="logoSizeSlider" oninput="updateLogoSize()">
+                </div>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="showWatermark" onchange="toggleWmControls(); renderCanvas()">
+                    <label for="showWatermark">워터마크 표시</label>
+                </div>
+                <div id="wmControls" style="display:none">
+                    <div class="slider-group">
+                        <label>투명도 <span id="wmOpacityVal">20</span>%</label>
+                        <input type="range" min="5" max="60" value="20" id="wmOpacitySlider"
+                            oninput="updateWmOpacity()">
+                    </div>
+                </div>
+                <p class="hint">💡 로고를 드래그하여 위치 조절</p>
+            </div>
+
+            <!-- 자재 라벨 -->
+            <div class="sidebar-section">
+                <h3 class="section-title">📌 자재 라벨</h3>
+                <div class="label-input-row">
+                    <input type="text" id="labelText" placeholder="라벨 텍스트 (예: ss-10)" class="text-input">
+                </div>
+                <button class="btn-action btn-primary" onclick="addLabel()">➕ 라벨 추가</button>
+                <div id="labelList" class="label-list"></div>
+            </div>
+        </aside>
+
+        <main class="canvas-area" id="canvasArea">
+            <div class="canvas-empty" id="canvasEmpty">
+                <span>🖼️</span>
+                <p>이미지를 업로드하고 프레임을 선택하세요</p>
+            </div>
+            <div class="canvas-container" id="canvasContainer" style="display:none">
+                <canvas id="mainCanvas"></canvas>
+            </div>
+        </main>
+    </div>
+
+    <script src="/image-editor.js"></script>
+</body>
+
+</html>

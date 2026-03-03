@@ -445,6 +445,20 @@
           </svg>
           <span>콘텐츠 자동화</span>
         </a>
+        <a href="javascript:void(0)" class="nav-item" id="navMarketing" onclick="switchView('marketing')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>마케팅 인사이트</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" id="navHalbuji" onclick="switchView('halbuji')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <span>할부지 편집기</span>
+        </a>
       </div>
 
       <div class="sidebar-section">
@@ -728,19 +742,7 @@
 
     <!-- 이미지 제작소 뷰 -->
     <div class="content-view" id="designView">
-      <header class="content-view-header">
-        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-        <div class="cv-icon" style="background:linear-gradient(135deg,#7c3aed,#ec4899)">🎨</div>
-        <div>
-          <div class="cv-title">이미지 제작소</div>
-          <div class="cv-sub">톤앤매너 학습 → 디자인 수정·생성</div>
-        </div>
-        <div class="cv-actions">
-          <button class="cv-external-btn" onclick="window.open('/design-studio.html','_blank')" title="새 창에서 열기">↗ 새
-            창</button>
-        </div>
-      </header>
-      <div class="content-iframe-wrap">
+      <div class="content-iframe-wrap" style="height:100%;">
         <iframe id="designFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
       </div>
     </div>
@@ -764,6 +766,50 @@
       </header>
       <div class="content-iframe-wrap">
         <iframe id="erpFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+      </div>
+    </div>
+
+    <!-- 마케팅 인사이트 뷰 -->
+    <div class="content-view" id="marketingView">
+      <header class="content-view-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="cv-icon" style="background:linear-gradient(135deg,#6366f1,#a855f7)">📊</div>
+        <div>
+          <div class="cv-title">마케팅 인사이트</div>
+          <div class="cv-sub">판매 순위 분석 · AI 마케팅 전략</div>
+        </div>
+        <div class="cv-actions">
+          <span class="cv-badge"
+            style="background:rgba(99,102,241,0.1);border-color:rgba(99,102,241,0.25);color:#6366f1;">📈 Infam
+            Analysis</span>
+          <button class="cv-external-btn" onclick="window.open('/marketing-insight.html','_blank')" title="새 창에서 열기">↗ 새
+            창</button>
+        </div>
+      </header>
+      <div class="content-iframe-wrap">
+        <iframe id="marketingFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
+      </div>
+    </div>
+
+    <!-- 할부지 편집기 뷰 -->
+    <div class="content-view" id="halbujiView">
+      <header class="content-view-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="cv-icon" style="background:linear-gradient(135deg,#f97316,#fb923c)">🖼️</div>
+        <div>
+          <div class="cv-title">할부지 편집기</div>
+          <div class="cv-sub">이미지 편집 · AI 최적화 · 워터마크</div>
+        </div>
+        <div class="cv-actions">
+          <span class="cv-badge"
+            style="background:rgba(249,115,22,0.1);border-color:rgba(249,115,22,0.25);color:#f97316;">🖼️ Image
+            Editor</span>
+          <button class="cv-external-btn" onclick="window.open('/image-editor.html','_blank')" title="새 창에서 열기">↗ 새
+            창</button>
+        </div>
+      </header>
+      <div class="content-iframe-wrap">
+        <iframe id="halbujiFrame" src="" style="width:100%;height:100%;border:none;"></iframe>
       </div>
     </div>
   </div>
@@ -798,6 +844,8 @@
       admin: { viewId: 'adminView', navId: 'navAdmin', frameId: 'adminFrame', src: '/admin.html' },
       design: { viewId: 'designView', navId: 'navDesign', frameId: 'designFrame', src: '/design-studio.html' },
       erp: { viewId: 'erpView', navId: 'navErp', frameId: 'erpFrame', src: '/erp-dashboard.html' },
+      marketing: { viewId: 'marketingView', navId: 'navMarketing', frameId: 'marketingFrame', src: '/marketing-insight.html' },
+      halbuji: { viewId: 'halbujiView', navId: 'navHalbuji', frameId: 'halbujiFrame', src: '/image-editor.html' },
     };
     let contentLoaded = false;
     let learnPanelLoaded = false;
