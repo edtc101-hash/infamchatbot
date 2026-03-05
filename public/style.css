@@ -1225,27 +1225,279 @@ textarea::-webkit-scrollbar {
   margin-top: 8px;
 }
 
-/* 마크다운 스타일 */
+/* ─── 마크다운 렌더링 스타일 (marked.js) ─── */
+
+/* 긴 메시지 버블 내부 스크롤 */
+.bubble {
+  max-height: 70vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+}
+
+.bubble::-webkit-scrollbar {
+  width: 5px;
+}
+
+.bubble::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bubble::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+}
+
+.bubble::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* 기본 텍스트 */
+.bubble p {
+  margin: 0 0 10px 0;
+  line-height: 1.75;
+}
+
+.bubble p:last-child {
+  margin-bottom: 0;
+}
+
 .bubble strong {
   font-weight: 700;
   color: var(--primary);
 }
 
+.bubble em {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
 .bubble a {
   color: var(--gold);
   text-decoration: none;
+  border-bottom: 1px solid rgba(176, 141, 87, 0.3);
+  transition: all 0.2s;
 }
 
 .bubble a:hover {
-  text-decoration: underline;
+  color: #a07840;
+  border-bottom-color: var(--gold);
 }
 
+/* 헤딩 */
+.bubble h1,
+.bubble h2,
+.bubble h3,
+.bubble h4 {
+  margin: 18px 0 8px 0;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.bubble h1:first-child,
+.bubble h2:first-child,
+.bubble h3:first-child,
+.bubble h4:first-child {
+  margin-top: 0;
+}
+
+.bubble h1 {
+  font-size: 1.35em;
+  padding-bottom: 6px;
+  border-bottom: 2px solid rgba(176, 141, 87, 0.2);
+}
+
+.bubble h2 {
+  font-size: 1.2em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(176, 141, 87, 0.12);
+}
+
+.bubble h3 {
+  font-size: 1.1em;
+  color: var(--gold);
+}
+
+.bubble h4 {
+  font-size: 1em;
+  color: var(--text-secondary);
+}
+
+/* 리스트 */
+.bubble ul,
+.bubble ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.bubble ul li,
+.bubble ol li {
+  margin-bottom: 5px;
+  line-height: 1.7;
+}
+
+.bubble ul li::marker {
+  color: var(--gold);
+}
+
+.bubble ol li::marker {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.bubble ul ul,
+.bubble ol ol,
+.bubble ul ol,
+.bubble ol ul {
+  margin: 4px 0;
+}
+
+/* 코드 블럭 */
+.bubble pre {
+  margin: 12px 0;
+  background: #1e293b;
+  border-radius: 10px;
+  overflow-x: auto;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bubble pre code {
+  display: block;
+  padding: 14px 18px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e2e8f0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* 인라인 코드 */
+.bubble code {
+  padding: 2px 7px;
+  background: rgba(176, 141, 87, 0.1);
+  border: 1px solid rgba(176, 141, 87, 0.15);
+  border-radius: 5px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.88em;
+  color: #b45309;
+  word-break: break-word;
+}
+
+/* 인용구 */
+.bubble blockquote {
+  margin: 10px 0;
+  padding: 10px 16px;
+  border-left: 4px solid var(--gold);
+  background: rgba(176, 141, 87, 0.05);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.bubble blockquote p {
+  margin: 0;
+}
+
+/* 테이블 */
+.bubble table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+  font-size: 14px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.bubble table thead th {
+  background: linear-gradient(135deg, rgba(176, 141, 87, 0.12), rgba(176, 141, 87, 0.06));
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 2px solid rgba(176, 141, 87, 0.2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.bubble table tbody td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+
+.bubble table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.bubble table tbody tr:nth-child(even) {
+  background: rgba(176, 141, 87, 0.03);
+}
+
+.bubble table tbody tr:hover {
+  background: rgba(176, 141, 87, 0.06);
+}
+
+/* 수평선 */
+.bubble hr {
+  margin: 16px 0;
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border-color), transparent);
+}
+
+/* 이미지 */
+.bubble img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+/* 사용자 메시지 버블 마크다운 오버라이드 */
 .message-group.user .bubble strong {
   color: var(--white);
 }
 
 .message-group.user .bubble a {
   color: var(--primary);
+  border-bottom-color: rgba(26, 26, 46, 0.3);
+}
+
+.message-group.user .bubble code {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--white);
+}
+
+.message-group.user .bubble h1,
+.message-group.user .bubble h2,
+.message-group.user .bubble h3,
+.message-group.user .bubble h4 {
+  color: var(--white);
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.message-group.user .bubble blockquote {
+  border-left-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.message-group.user .bubble ul li::marker,
+.message-group.user .bubble ol li::marker {
+  color: var(--white);
+}
+
+/* 채팅 영역 부드러운 스크롤 */
+.chat-messages {
+  scroll-behavior: smooth;
 }
 
 /* === 링크 카드 === */

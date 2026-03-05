@@ -14,10 +14,7 @@
     <header class="editor-header">
         <div class="header-left">
             <div class="header-logo">
-                <img src="/infam-logo.svg" alt="InFam"
-                    onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                <span class="logo-fallback"
-                    style="display:none;width:36px;height:36px;background:#f97316;border-radius:10px;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;">if</span>
+                <img src="/infam-logo.svg" alt="InFam" onerror="this.style.display='none'">
             </div>
             <div>
                 <h1>InFam. <span class="header-sub">할부지 편집기</span></h1>
@@ -31,11 +28,11 @@
 
     <div class="editor-layout">
         <aside class="sidebar" id="sidebar">
-            <!-- 이미지 업로드 (다중) -->
+            <!-- 이미지 업로드 -->
             <div class="sidebar-section">
                 <h3 class="section-title">📷 이미지 업로드</h3>
                 <div class="upload-zone" id="imageUploadZone">
-                    <div class="upload-placeholder" id="uploadPlaceholder">
+                    <div class="upload-placeholder">
                         <span class="upload-icon">🖼️</span>
                         <p>클릭 또는 드래그하여 업로드</p>
                         <p class="upload-sub">여러 장 동시 업로드 가능</p>
@@ -43,7 +40,6 @@
                     <input type="file" id="imageInput" accept="image/*" multiple
                         onchange="handleMultiUpload(this.files)">
                 </div>
-                <div class="image-gallery" id="imageGallery"></div>
             </div>
 
             <!-- 프레임 설정 -->
@@ -84,9 +80,8 @@
             <div class="sidebar-section ai-section" id="aiSection" style="display:none">
                 <h3 class="section-title">🚀 AI 4K 스케일 업 <span class="ai-badge">NANO BANANA</span></h3>
                 <p class="hint" style="margin-bottom:10px">AI가 이미지를 4K 해상도로 업스케일합니다</p>
-                <button class="btn-action btn-ai-optimize" id="aiOptimizeBtn" onclick="ai4KUpscale()">
-                    🚀 4K 스케일 업
-                </button>
+                <button class="btn-action btn-ai-optimize" id="aiOptimizeBtn" onclick="ai4KUpscale()">🚀 4K 스케일
+                    업</button>
                 <div class="ai-progress" id="aiProgress" style="display:none">
                     <div class="ai-progress-bar">
                         <div class="ai-progress-fill"></div>
@@ -96,39 +91,67 @@
                 <p class="ai-result-msg" id="aiResultMsg"></p>
             </div>
 
-            <!-- 로고 & 워터마크 (자동) -->
-            <div class="sidebar-section">
-                <h3 class="section-title">🏷️ 로고 & 워터마크</h3>
-                <div class="checkbox-row">
-                    <input type="checkbox" id="showLogo" checked onchange="renderCanvas()">
-                    <label for="showLogo">InFam 로고 표시</label>
-                </div>
-                <div class="slider-group">
-                    <label>로고 크기 <span id="logoSizeVal">60</span>px</label>
-                    <input type="range" min="20" max="200" value="60" id="logoSizeSlider" oninput="updateLogoSize()">
-                </div>
-                <div class="checkbox-row">
-                    <input type="checkbox" id="showWatermark" onchange="toggleWmControls(); renderCanvas()">
-                    <label for="showWatermark">워터마크 표시</label>
-                </div>
-                <div id="wmControls" style="display:none">
-                    <div class="slider-group">
-                        <label>투명도 <span id="wmOpacityVal">20</span>%</label>
-                        <input type="range" min="5" max="60" value="20" id="wmOpacitySlider"
-                            oninput="updateWmOpacity()">
-                    </div>
-                </div>
-                <p class="hint">💡 로고를 드래그하여 위치 조절</p>
-            </div>
-
             <!-- 자재 라벨 -->
             <div class="sidebar-section">
                 <h3 class="section-title">📌 자재 라벨</h3>
                 <div class="label-input-row">
                     <input type="text" id="labelText" placeholder="라벨 텍스트 (예: ss-10)" class="text-input">
                 </div>
+                <div class="slider-group">
+                    <label>글자 크기 <span id="labelSizeVal">30</span>px</label>
+                    <input type="range" min="10" max="80" value="30" id="labelSizeSlider"
+                        oninput="document.getElementById('labelSizeVal').textContent=this.value">
+                </div>
                 <button class="btn-action btn-primary" onclick="addLabel()">➕ 라벨 추가</button>
+                <button class="btn-action btn-ai-optimize" id="autoLabelBtn" onclick="autoLabel()"
+                    style="font-size:13px;padding:10px;margin-top:6px">
+                    🤖 AI 자동 라벨 감지
+                </button>
+                <div class="pointer-controls"
+                    style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+                    <p style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:8px">📍 포인터 스타일</p>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <label style="font-size:11px;color:var(--text-sub);min-width:32px">색상</label>
+                        <input type="color" id="pointerColor" value="#ffffff" onchange="renderSelectedCanvas()"
+                            style="width:28px;height:28px;border:none;cursor:pointer;background:none">
+                        <label style="font-size:11px;color:var(--text-sub);margin-left:auto;min-width:32px">두께</label>
+                        <input type="range" min="1" max="8" value="2" id="pointerWidth" oninput="renderSelectedCanvas()"
+                            style="width:80px">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <label style="font-size:11px;color:var(--text-sub);min-width:32px">점 크기</label>
+                        <input type="range" min="2" max="15" value="5" id="pointerDotSize"
+                            oninput="renderSelectedCanvas()" style="width:80px">
+                    </div>
+                </div>
                 <div id="labelList" class="label-list"></div>
+            </div>
+
+            <!-- AI 캡션 생성 -->
+            <div class="sidebar-section ai-section">
+                <h3 class="section-title">✍️ AI 캡션 생성 <span class="ai-badge">GEMINI</span></h3>
+                <div class="label-input-row">
+                    <input type="text" id="captionProduct" placeholder="제품명 (예: ss-13 오크 바닥재)" class="text-input">
+                </div>
+                <select id="captionTone" class="text-input" style="margin-bottom:8px">
+                    <option value="전문적이면서 세련된">🎯 전문적 & 세련된</option>
+                    <option value="친근하고 따뜻한">🤗 친근 & 따뜻한</option>
+                    <option value="트렌디하고 감각적인">✨ 트렌디 & 감각적</option>
+                    <option value="고급스럽고 럭셔리한">💎 럭셔리</option>
+                </select>
+                <button class="btn-action btn-ai-optimize" id="captionGenBtn" onclick="generateCaption()"
+                    style="font-size:13px;padding:10px">
+                    ✍️ 캡션 자동 생성
+                </button>
+                <div id="captionResult" class="caption-result" style="display:none">
+                    <div class="caption-text" id="captionText"></div>
+                    <div class="caption-actions">
+                        <button class="btn-action btn-secondary" onclick="copyCaption()" style="flex:1">📋 복사</button>
+                        <button class="btn-action btn-secondary" onclick="generateCaption()" style="flex:1">🔄
+                            다시</button>
+                    </div>
+                </div>
+                <p class="ai-result-msg" id="captionMsg"></p>
             </div>
         </aside>
 
@@ -137,9 +160,7 @@
                 <span>🖼️</span>
                 <p>이미지를 업로드하고 프레임을 선택하세요</p>
             </div>
-            <div class="canvas-container" id="canvasContainer" style="display:none">
-                <canvas id="mainCanvas"></canvas>
-            </div>
+            <div class="preview-grid" id="previewGrid" style="display:none"></div>
         </main>
     </div>
 

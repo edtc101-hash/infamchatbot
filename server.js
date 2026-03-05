@@ -36,15 +36,15 @@ if (!GEMINI_API_KEY) {
     process.exit(1);
 }
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' }); // 채팅/학습용 (안정 모델)
+const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' }); // 채팅/학습용 (최고 성능 모델)
 const flashModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // 빠른 분석용 (폴백)
 const visionModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // 시각 분석용
 
 // Nano Banana 2 (Gemini 3.1 Flash Image — 최신 이미지 생성)
 const GEMINI_IMAGE_API_KEY = process.env.GEMINI_IMAGE_API_KEY || GEMINI_API_KEY;
 const genAINB = new GoogleGenAI({ apiKey: GEMINI_IMAGE_API_KEY });
-const IMAGE_GEN_MODEL = 'gemini-3.1-flash-image-preview'; // Nano Banana 2
-const IMAGE_GEN_FALLBACK = 'gemini-3-pro-image-preview'; // Nano Banana 1 (fallback)
+const IMAGE_GEN_MODEL = 'gemini-2.0-flash-preview-image-generation'; // 가장 빠른 이미지 생성 모델
+const IMAGE_GEN_FALLBACK = 'gemini-2.0-flash'; // 폴백
 
 // RAG 파이프라인에 API 키 설정
 setApiKey(GEMINI_API_KEY);
@@ -169,6 +169,16 @@ function classifyIntent(message) {
     // 의도별 키워드 사전 (우선순위 순)
     const intents = [
         {
+            id: '인사_감사',
+            keywords: ['안녕', '감사', '고마', '수고', '반갑', '처음', '도움', '감사합니다', '고맙습니다'],
+            patterns: [/^(안녕|감사|반갑|수고)/, /^(hi|hello)/i]
+        },
+        {
+            id: '회사_정보',
+            keywords: ['인재상', '업무관', '비전', 'EDTC', '회사', '기업', '문화', '계명', '인팸소개', '조직'],
+            patterns: [/인팸.*(뭐|무엇|어떤|소개)/, /회사.*(소개|정보|문화)/]
+        },
+        {
             id: '가격_규격',
             keywords: ['가격', '얼마', '단가', '비용', '원', '규격', '사이즈', '크기', '두께', '무게',
                 '스펙', '치수', '길이', '너비', '폭', '높이', 'mm', 'cm', 'kg',
@@ -195,7 +205,7 @@ function classifyIntent(message) {
         },
         {
             id: '재고_샘플',
-            keywords: ['재고', '샘플', '견본', '실물', '쇼룸', '방문', '위치', '주소'],
+            keywords: ['재고', '샘플', '견본', '실물', '쇼룸', '방문', '위치', '주소', '몇장', '남아'],
             patterns: [/재고\s*(있|확인|남)/, /샘플\s*(구매|주문|받)/]
         },
         {
@@ -302,6 +312,7 @@ function generateId() {
 // 대화 히스토리 세션 관리
 // ========================
 const sessions = {};
+const SESSION_TTL = 1000 * 60 * 30; // 30분 비활성 시 만료
 
 function getSession(sessionId) {
     if (!sessions[sessionId]) {
@@ -315,6 +326,19 @@ function getSession(sessionId) {
     sessions[sessionId].lastActive = Date.now();
     return sessions[sessionId];
 }
+
+// 만료 세션 정리 (5분마다)
+setInterval(() => {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const sid of Object.keys(sessions)) {
+        if (now - sessions[sid].lastActive > SESSION_TTL) {
+            delete sessions[sid];
+            cleaned++;
+        }
+    }
+    if (cleaned > 0) console.log(`🧹 만료 세션 ${cleaned}개 정리`);
+}, 1000 * 60 * 5);
 
 // ========================
 // 응답 캐시
@@ -594,6 +618,30 @@ function buildSmartFallback(message, faqs) {
 }
 
 // ========================
+// ERP 재고 직접 조회 (AI 컨텍스트 주입용)
+// ========================
+function lookupERPInventory(message) {
+    try {
+        const erpFile = path.join(__dirname, 'erp-scraped-data.json');
+        if (!fs.existsSync(erpFile)) return [];
+        const erp = JSON.parse(fs.readFileSync(erpFile, 'utf-8'));
+        if (!erp.inventory) return [];
+
+        const msgLower = message.toLowerCase().replace(/[\s\-\/]+/g, '');
+        const matched = [];
+        for (const item of erp.inventory) {
+            const nameNorm = (item.name || '').toLowerCase().replace(/[\s\-\/]+/g, '');
+            if (nameNorm && nameNorm.length >= 2 && msgLower.includes(nameNorm)) {
+                matched.push(item);
+            }
+        }
+        return matched;
+    } catch {
+        return [];
+    }
+}
+
+// ========================
 // 채팅 API
 // ========================
 app.post('/api/chat', async (req, res) => {
@@ -614,10 +662,13 @@ app.post('/api/chat', async (req, res) => {
     const PRODUCT_DATA = loadProductData();
     const relevantProducts = findRelevantProducts(message, PRODUCT_DATA);
 
+    // ERP 재고 직접 조회
+    const erpInventory = lookupERPInventory(message);
+
     // RAG 벡터 검색 (의미 기반)
     let ragResults = [];
     try {
-        ragResults = await ragSearch(message, 3);
+        ragResults = await ragSearch(message, 5);
     } catch (ragErr) {
         console.log('RAG 검색 스킵:', ragErr.message);
     }
@@ -666,72 +717,78 @@ app.post('/api/chat', async (req, res) => {
         relevantFAQs, relevantProducts, ragResults, relevantLearned
     });
 
+    // ERP 재고 직접 매칭 결과 주입
+    if (erpInventory.length > 0) {
+        const erpText = erpInventory.map(i =>
+            `${i.name} (${i.color || '-'}) | 규격: ${i.spec} | 두께: ${i.thickness} | **현재 재고: ${i.qty}장**`
+        ).join('\n');
+        contextBlocks.unshift(`[★ ERP 실시간 재고 — 정확한 데이터]\n${erpText}`);
+    }
+
     const contextSection = contextBlocks.length > 0
         ? `\n\n=== 참고 자료 (질문 의도에 맞는 정보만 선별됨) ===\n${contextBlocks.join('\n\n')}`
         : '';
 
-    // Chain-of-Thought 시스템 프롬프트
-    const systemPrompt = `당신은 인팸(InteriorFamily)의 **수석 인테리어 자재 컨설턴트**입니다.
-10년 이상의 벽장재·바닥재·석재·금속패널 경험을 가진 전문가로서 고객에게 상담합니다.
+    // 시스템 인스트럭션 (고정 — 매 요청마다 반복하지 않음)
+    const systemInstruction = `당신은 인팸(InteriorFamily)의 **내부 CS 어시스턴트**입니다.
+직원이 고객으로부터 받은 질문을 입력하면, 고객에게 바로 전달(복사-붙여넣기) 가능한 답변 초안을 생성합니다.
 
 ${BRAND_KNOWLEDGE}
 
-=== 🎯 질문 의도 분류 결과: 【${intent.id}】 ===
+=== 답변 생성 규칙 ===
+1. 참고 자료에 구체적 정보가 있으면 그것을 근거로 정확히 답변하세요.
+2. 참고 자료에 없는 정보는 절대 지어내지 마세요. "정확한 사항은 담당자 확인이 필요합니다"로 안내하세요.
+3. ERP 재고 데이터가 있으면 반드시 재고 수량을 포함하여 답변하세요.
 
-이 고객의 질문은 【${intent.id}】 카테고리로 분류되었습니다.
-반드시 이 의도에 집중하여 답변하세요. 다른 카테고리(예: 배송, 시공 등)의 정보를 섞지 마세요.
+=== 답변 형식 (필수) ===
+답변은 반드시 아래 두 영역으로 나누어 작성하세요:
 
-=== 답변 생성 규칙 (Chain-of-Thought) ===
+**📋 고객 전달용 답변:**
+(아래 내용은 직원이 그대로 복사해서 카카오톡/문자로 고객에게 보낼 수 있는 텍스트입니다)
+- 격식체 필수: "~합니다", "~드리겠습니다" ("~해요", "~이에요" 금지)
+- 마크다운 서식(**, ##, - 등) 사용 금지. 일반 텍스트만 사용하세요.
+- 줄바꿈과 이모지를 적절히 활용하여 가독성 좋게 작성하세요.
+- 인사말은 "안녕하세요, 인팸입니다!" 또는 적절한 인사로 시작하세요.
+- 간결하되 충분한 정보 제공: 3~6문장 + 관련 링크.
+- 마무리는 "추가 문의 사항이 있으시면 편하게 말씀해 주세요!" 등 친절한 마무리로 끝내세요.
+- 관련 링크가 있으면 자연스럽게 포함하세요.
 
-아래 단계를 따르되, 생각 과정은 출력하지 말고 최종 답변만 출력하세요:
-
-[1단계] 질문 의도 확인: 고객이 정확히 무엇을 알고 싶은지 파악하세요.
-  - 가격/규격 질문 → 반드시 구체적인 숫자(가격, 크기, 두께 등)를 포함하세요.
-  - 배송 질문 → 배송 방법, 기간, 비용에 대해서만 답변하세요.
-  - 시공 질문 → 시공 방법, 주의사항, 가이드에 대해서만 답변하세요.
-  - 제품 소개 → 제품 특징, 장점, 용도에 대해서만 답변하세요.
-
-[2단계] 참고 자료에서 해당 의도에 맞는 정보만 선택하세요. 관련 없는 정보는 무시하세요.
-
-[3단계] 전문가 관점으로 답변을 구성하세요.
-  - 참고 자료에 구체적 정보가 있으면 그것을 근거로 정확히 답변하세요.
-  - 참고 자료에 없는 정보는 절대 지어내지 마세요. "정확한 사항은 담당자 확인이 필요합니다"로 안내하세요.
-
-=== 대화 스타일 ===
-
-- **격식체 필수**: "~합니다", "~드리겠습니다" ("~해요", "~이에요" 금지)
-- **인사말 금지**: 첫 문장부터 바로 본론
-- **간결하되 깊이 있게**: 3~5문장으로 핵심 + 전문가 인사이트. 필요시 번호 항목 정리.
+**💡 내부 참고 메모:**
+(아래는 직원만 참고할 내용으로, 고객에게 전달하지 않습니다)
+- 답변의 근거가 된 출처 (FAQ, RAG 검색 결과, 카탈로그 등)
+- 추가로 확인이 필요한 사항
+- 고객에게 후속으로 물어볼 만한 사항 제안
 
 === 후속 질문 생성 (필수) ===
-
-답변 본문을 작성한 후, 반드시 마지막에 아래 형식으로 후속 질문 3개를 추가하세요.
-고객이 현재 질문 맥락에서 다음에 궁금해할 만한 실용적인 질문을 제안하세요.
-
+내부 참고 메모 이후에 반드시 아래 형식으로 후속 질문 3개를 추가하세요:
 ---SUGGESTED---
-["후속 질문 1", "후속 질문 2", "후속 질문 3"]
+["고객이 추가로 물어볼 수 있는 질문 1", "질문 2", "질문 3"]
 ---END---
 
-예시:
-- 가격 질문 후 → ["샘플 구매는 어떻게 하나요?", "이 제품 재고가 있나요?", "시공 방법이 궁금합니다"]
-- 배송 질문 후 → ["당일 배송 가능한 제품은?", "배송비는 얼마인가요?", "대량 주문도 가능한가요?"]
-
 === 링크 활용 ===
-
-관련 제품/서비스 언급 시 아래 링크를 자연스럽게 포함하세요:
+관련 제품/서비스 언급 시 아래 링크를 고객 전달용 답변에 자연스럽게 포함하세요:
 - 재고 확인: https://drive.google.com/drive/folders/1y5C5T12d3VrMG2H-7N3CNIVMJfqDEY2d
 - 샘플 구매: https://buly.kr/6MrEuTY
 - 시공 사례: https://www.notion.so/edtc/f71f248770b5409ba158a210ab71db7d?v=600a30831a484786b25e4f55293ff749
 - 쇼룸 위치: https://naver.me/G1wCKANl
-- 전체 카탈로그: https://link.inpock.co.kr/interiorfamily
+- 전체 카탈로그: https://link.inpock.co.kr/interiorfamily`;
+
+    // 사용자 메시지 (변동 부분만)
+    const userMessage = `🎯 질문 의도: 【${intent.id}】
 ${contextSection}${historyContext}
 
-고객 질문: ${message}`;
+고객으로부터 받은 질문: ${message}`;
 
     let aiResponse = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    const modelsToTry = [
+        { m: model, name: 'gemini-2.5-pro' },
+        { m: flashModel, name: 'gemini-2.5-flash' }
+    ];
+
+    for (const { m, name } of modelsToTry) {
         try {
-            const chat = model.startChat({
+            const chat = m.startChat({
+                systemInstruction: { parts: [{ text: systemInstruction }] },
                 history: session.history.slice(-10).map(h => ({
                     role: h.role, parts: [{ text: h.content }]
                 })),
@@ -742,16 +799,15 @@ ${contextSection}${historyContext}
                     topK: 20
                 }
             });
-            const result = await chat.sendMessage(systemPrompt);
+            const result = await chat.sendMessage(userMessage);
             aiResponse = result.response.text();
-            console.log(`✅ AI 응답 성공 (시도 ${attempt}, 모델: gemini-3.1-pro-preview, 의도: ${intent.id})`);
+            console.log(`✅ AI 응답 성공 (모델: ${name}, 의도: ${intent.id})`);
             break;
         } catch (err) {
             const isQuota = err.status === 429;
             const isNotFound = err.status === 404;
-            console.log(`AI 시도 ${attempt} 실패 (${err.status}):`, isQuota ? '할당량 초과' : isNotFound ? '모델 없음' : err.message);
-            if (isNotFound || attempt === 2) break;
-            if (isQuota) await new Promise(r => setTimeout(r, 3000));
+            console.log(`⚠️ AI ${name} 실패 (${err.status}):`, isQuota ? '할당량 초과' : isNotFound ? '모델 없음' : err.message);
+            if (isQuota) await new Promise(r => setTimeout(r, 2000));
         }
     }
 
@@ -793,6 +849,8 @@ ${contextSection}${historyContext}
     console.log('📚 스마트 폴백 사용');
     const fallbackResponse = buildSmartFallback(message, relevantFAQs);
     const fallbackSuggestions = {
+        '인사_감사': ['어떤 제품을 취급하나요?', '인팸은 어떤 회사인가요?', '쇼룸 위치가 어디인가요?'],
+        '회사_정보': ['어떤 제품이 있나요?', '쇼룸 방문 가능한가요?', '배송은 어떻게 되나요?'],
         '가격_규격': ['샘플 구매는 어떻게 하나요?', '재고가 있나요?', '대량 주문 할인도 가능한가요?'],
         '배송': ['당일 배송 가능한 제품은 무엇인가요?', '배송비는 얼마인가요?', '제주/도서산간 배송도 가능한가요?'],
         '시공': ['시공 시 필요한 부자재는 뭔가요?', 'DIY 시공이 가능한가요?', '시공 후 관리 방법은?'],
@@ -800,7 +858,7 @@ ${contextSection}${historyContext}
         '재고_샘플': ['당일 배송이 가능한가요?', '가격이 어떻게 되나요?', '대량 구매 시 할인이 되나요?'],
         '기타': ['제품 종류가 어떻게 되나요?', '배송은 어떻게 진행되나요?', '쇼룸 위치가 어디인가요?']
     };
-    setCache(message, fallbackResponse, matchedFAQsForClient);
+    // 폴백 응답은 캐시하지 않음 (AI 복구 후 저품질 응답 방지)
     res.json({
         response: fallbackResponse,
         fromFallback: true,
@@ -2804,6 +2862,107 @@ app.post('/api/ig/schedule', async (req, res) => {
     } catch (e) {
         console.error('❌ Instagram 예약 실패:', e.message);
         res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ========================
+// AI 자동 라벨 감지 API (Gemini Vision)
+// ========================
+app.post('/api/ai/auto-label', async (req, res) => {
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ success: false, message: '이미지가 필요합니다.' });
+
+    try {
+        console.log('🏷️ AI 자동 라벨 감지 시작...');
+
+        const base64Match = image.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
+        if (!base64Match) throw new Error('유효하지 않은 이미지 형식');
+
+        const mimeType = `image/${base64Match[1]}`;
+        const base64Data = base64Match[2];
+
+        const prompt = `당신은 인테리어 자재 전문가입니다. 이 사진을 분석하여 보이는 자재/제품을 식별해주세요.
+
+각 자재에 대해 다음 정보를 JSON 배열로 반환하세요:
+- text: 자재의 제품명 또는 코드 (예: "ss-13", "오크 바닥재", "대리석 타일", "PVC 몰딩" 등). 가능하면 구체적인 제품 코드 형식으로 작성.
+- x: 해당 자재가 사진에서 위치하는 x 좌표 비율 (0.0~1.0, 왼쪽이 0, 오른쪽이 1)
+- y: 해당 자재가 사진에서 위치하는 y 좌표 비율 (0.0~1.0, 위가 0, 아래가 1)
+- pointerX: 라벨이 가리킬 정확한 자재 위치의 x 비율 (자재의 중심점)
+- pointerY: 라벨이 가리킬 정확한 자재 위치의 y 비율 (자재의 중심점)
+
+라벨 위치(x,y)는 포인터 위치에서 약간 떨어진 곳에 배치하세요 (겹치지 않도록).
+최대 5개까지만 식별하세요.
+
+반드시 아래 형식의 JSON만 출력하세요. 다른 텍스트는 포함하지 마세요:
+[{"text":"제품명","x":0.3,"y":0.2,"pointerX":0.4,"pointerY":0.5}]`;
+
+        const result = await genAINB.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{
+                role: 'user',
+                parts: [
+                    { inlineData: { mimeType, data: base64Data } },
+                    { text: prompt }
+                ]
+            }],
+            config: { temperature: 0.3, maxOutputTokens: 500 }
+        });
+
+        let responseText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+        // JSON 추출 (```json ... ``` 감싸기 처리)
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) throw new Error('라벨 데이터를 추출할 수 없습니다.');
+
+        const labels = JSON.parse(jsonMatch[0]);
+        console.log(`✅ AI 자동 라벨 감지 완료: ${labels.length}개 자재 식별`);
+        res.json({ success: true, labels });
+    } catch (err) {
+        console.error('❌ 자동 라벨 오류:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ========================
+// AI 인스타 캡션 자동 생성 API
+// ========================
+app.post('/api/ai/generate-caption', async (req, res) => {
+    const { productName, tone } = req.body;
+    if (!productName) return res.status(400).json({ success: false, message: '제품명이 필요합니다.' });
+
+    try {
+        console.log(`✍️ AI 캡션 생성 요청: ${productName}`);
+
+        const prompt = `당신은 인테리어 자재 전문 인스타그램 마케터입니다.
+아래 제품에 대한 인스타그램 게시물 캡션을 한국어로 작성해주세요.
+
+제품명: ${productName}
+톤: ${tone || '전문적이면서 세련된'}
+
+규칙:
+1. 첫 줄은 눈에 띄는 후킹 문구 (이모지 포함)
+2. 제품의 장점과 적용 공간을 자연스럽게 설명 (2~3문장)
+3. 시공/인테리어 팁 한 줄
+4. CTA(Call to Action) 문구
+5. 관련 해시태그 8~12개 (마지막 줄)
+6. 전체 길이는 인스타그램에 적합하게 200~400자
+7. 브랜드명 @interior__family 를 자연스럽게 포함
+
+캡션만 출력하세요. 다른 설명은 하지 마세요.`;
+
+        const result = await genAINB.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: { temperature: 0.8, maxOutputTokens: 600 }
+        });
+
+        const caption = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (!caption) throw new Error('캡션 생성 실패');
+
+        console.log(`✅ 캡션 생성 완료 (${caption.length}자)`);
+        res.json({ success: true, caption });
+    } catch (err) {
+        console.error('❌ 캡션 생성 오류:', err.message);
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 

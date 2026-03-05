@@ -16,6 +16,8 @@ try { xlsx = require('xlsx'); } catch (e) { console.warn('xlsx 미설치'); }
 const FAQ_FILE = path.join(__dirname, '..', 'faq-data.json');
 const PRODUCT_FILE = path.join(__dirname, '..', 'product-data.json');
 const LEARNED_FILE = path.join(__dirname, '..', 'learned-data.json');
+const ERP_FILE = path.join(__dirname, '..', 'erp-scraped-data.json');
+const COMPANY_FILE = path.join(__dirname, '..', 'company-content.json');
 const BUILD_STATUS_FILE = path.join(__dirname, '..', 'rag-data', 'build-status.json');
 
 let isBuilding = false;
@@ -76,14 +78,14 @@ function prepareProductDocuments() {
     const docs = [];
     for (const [cat, prods] of Object.entries(categorized)) {
         // 카테고리 요약 문서
-        const summary = prods.slice(0, 10).map(p =>
+        const summary = prods.slice(0, 20).map(p =>
             `제품번호: ${p.productId}, 디자인: ${p.design}, 규격: ${p.spec}, 가격: ${p.price}`
         ).join('\n');
 
         docs.push({
             id: `product_cat_${cat.replace(/\s+/g, '_')}`,
             title: `${cat} 제품 카탈로그`,
-            content: `[제품 카테고리: ${cat}] 총 ${prods.length}개 제품\n${summary}${prods.length > 10 ? `\n... 외 ${prods.length - 10}개 제품` : ''}`,
+            content: `[제품 카테고리: ${cat}] 총 ${prods.length}개 제품\n${summary}${prods.length > 20 ? `\n... 외 ${prods.length - 20}개 제품` : ''}`,
             category: '제품',
         });
     }
@@ -106,6 +108,85 @@ function prepareLearnedDocuments() {
             keywords: item.keywords || [],
         }));
     } catch { return []; }
+}
+
+/**
+ * ERP 재고/매출 데이터를 벡터 문서로 변환
+ */
+function prepareERPDocuments() {
+    if (!fs.existsSync(ERP_FILE)) return [];
+    try {
+        const erp = JSON.parse(fs.readFileSync(ERP_FILE, 'utf-8'));
+        const docs = [];
+
+        // 재고 데이터 — 제품별 문서
+        if (erp.inventory && erp.inventory.length > 0) {
+            const inventoryContent = erp.inventory.map(item =>
+                `제품코드: ${item.code}, 제품명: ${item.name}, 규격: ${item.spec}, 색상: ${item.color}, 두께: ${item.thickness}, 재고수량: ${item.qty}장`
+            ).join('\n');
+            docs.push({
+                id: 'erp_inventory_all',
+                title: 'ERP 재고 현황 (전체)',
+                content: `[실시간 재고 현황 — 스크래핑 일시: ${erp.scrapedAt}]\n총 ${erp.inventory.length}개 품목, 총 재고 ${erp.summary?.totalInventoryQty || ''}장\n\n${inventoryContent}`,
+                category: 'ERP재고',
+                keywords: ['재고', '수량', '있나요', '몇장', '남아'],
+            });
+
+            // 개별 인기 제품별 문서 (재고 10장 이상인 것)
+            for (const item of erp.inventory.filter(i => i.qty >= 10)) {
+                docs.push({
+                    id: `erp_inv_${item.code}`,
+                    title: `${item.name} ${item.color || ''} 재고`,
+                    content: `[재고] ${item.name} (${item.color || '-'}) | 규격: ${item.spec} | 두께: ${item.thickness} | 현재 재고: ${item.qty}장 (${erp.scrapedAt} 기준)`,
+                    category: 'ERP재고',
+                    keywords: [item.name, item.color, '재고'].filter(Boolean),
+                });
+            }
+        }
+
+        // 최근 매출 요약
+        if (erp.sales && erp.sales.length > 0) {
+            const recentSales = erp.sales.slice(0, 10).map(s =>
+                `${s.date} | ${s.customer} | ${s.product} | 수량: ${s.qty} | 금액: ${s.amount?.toLocaleString()}원 | 상태: ${s.status}`
+            ).join('\n');
+            docs.push({
+                id: 'erp_sales_recent',
+                title: '최근 매출/주문 현황',
+                content: `[최근 영업 현황 — ${erp.period?.from} ~ ${erp.period?.to}]\n총 매출: ${erp.summary?.totalSalesAmt?.toLocaleString()}원, ${erp.summary?.salesCount}건\n\n${recentSales}`,
+                category: 'ERP매출',
+            });
+        }
+
+        return docs;
+    } catch (e) {
+        console.warn('ERP 데이터 파싱 실패:', e.message);
+        return [];
+    }
+}
+
+/**
+ * 회사 정보/문화 데이터를 벡터 문서로 변환
+ */
+function prepareCompanyDocuments() {
+    if (!fs.existsSync(COMPANY_FILE)) return [];
+    try {
+        const company = JSON.parse(fs.readFileSync(COMPANY_FILE, 'utf-8'));
+        const htmlContent = company.content || '';
+        // HTML 태그 제거
+        const text = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!text || text.length < 30) return [];
+
+        return [{
+            id: 'company_info',
+            title: '인팸(InteriorFamily) 회사 소개 및 문화',
+            content: `[회사 정보] ${text}`,
+            category: '회사정보',
+            keywords: ['인재상', '업무관', 'EDTC', '비전', '기업', '회사', '인팸'],
+        }];
+    } catch (e) {
+        console.warn('회사 정보 파싱 실패:', e.message);
+        return [];
+    }
 }
 
 /**
@@ -231,9 +312,11 @@ async function buildVectorStore() {
         const learnedDocs = prepareLearnedDocuments();
         const catalogDocs = await prepareCatalogDocuments();
         const excelDocs = prepareExcelDocuments();
-        const allDocs = [...faqDocs, ...productDocs, ...learnedDocs, ...catalogDocs, ...excelDocs];
+        const erpDocs = prepareERPDocuments();
+        const companyDocs = prepareCompanyDocuments();
+        const allDocs = [...faqDocs, ...productDocs, ...learnedDocs, ...catalogDocs, ...excelDocs, ...erpDocs, ...companyDocs];
 
-        console.log(`📄 문서 준비 완료: FAQ ${faqDocs.length}개, 제품 ${productDocs.length}개, 학습 ${learnedDocs.length}개, 카탈로그 ${catalogDocs.length}개, Excel ${excelDocs.length}개 (총 ${allDocs.length}개)`);
+        console.log(`📄 문서 준비 완료: FAQ ${faqDocs.length}개, 제품 ${productDocs.length}개, 학습 ${learnedDocs.length}개, 카탈로그 ${catalogDocs.length}개, Excel ${excelDocs.length}개, ERP ${erpDocs.length}개, 회사 ${companyDocs.length}개 (총 ${allDocs.length}개)`);
 
         if (allDocs.length === 0) {
             console.log('⚠️ 인덱싱할 문서가 없습니다.');
@@ -296,7 +379,7 @@ async function ragSearch(query, limit = 5) {
 
     try {
         const queryEmbedding = await generateEmbedding(query, apiKey);
-        const results = searchByEmbedding(queryEmbedding, limit, 0.3);
+        const results = searchByEmbedding(queryEmbedding, limit, 0.25);
         return results;
     } catch (err) {
         console.error('RAG 검색 오류:', err.message);
@@ -325,4 +408,6 @@ module.exports = {
     prepareFAQDocuments,
     prepareProductDocuments,
     prepareLearnedDocuments,
+    prepareERPDocuments,
+    prepareCompanyDocuments,
 };

@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const CACHE_FILE = path.join(__dirname, '..', 'rag-data', 'embedding-cache.json');
 
@@ -40,17 +41,11 @@ function saveCache() {
     }
 }
 
-/** 캐시 키 생성 (텍스트 해시) */
+/** 캐시 키 생성 (SHA-256 해시 — 충돌 방지) */
 function cacheKey(text) {
-    // 간단한 해시 — 동일 텍스트 재임베딩 방지
-    let hash = 0;
     const str = text.trim().toLowerCase();
-    for (let i = 0; i < str.length; i++) {
-        const chr = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + chr;
-        hash |= 0;
-    }
-    return `emb_${hash}_${str.length}`;
+    const hash = crypto.createHash('sha256').update(str, 'utf-8').digest('hex').substring(0, 16);
+    return `emb_${hash}`;
 }
 
 /**

@@ -118,22 +118,15 @@ function getKnownUrlName(url) {
     return null;
 }
 
-// 메시지 포맷팅 - 마크다운 변환 + URL → 카드
+// 메시지 포맷팅 - marked.js 기반 마크다운 변환 + URL → 카드
 function formatMessage(text) {
     // URL 앞 라벨 텍스트도 포함하여 캡처 (예: "크리스탈 블럭 카탈로그: https://...")
     const urlPattern = /((?:[가-힣a-zA-Z0-9\s]+[:\-→]\s*)?(?:🔗\s*)?)(https?:\/\/[^\s\n<>"')\]]+)/g;
     const usedUrls = new Set();
     const linkCards = [];
 
-    // 마크다운 변환
-    let formatted = text
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/^- (.+)/gm, '• $1')
-        .replace(/^\d+\. (.+)/gm, (m) => `${m}`);
-
-    // URL을 카드로 변환 (앞의 라벨 텍스트도 함께 제거)
-    const tempText = formatted.replace(urlPattern, (fullMatch, prefix, url) => {
+    // 1단계: URL을 먼저 추출하고 카드로 변환할 준비
+    let textForMd = text.replace(urlPattern, (fullMatch, prefix, url) => {
         url = url.replace(/[.,;:!?]+$/, '');
         if (!isValidUrl(url)) return '';
 
@@ -161,15 +154,36 @@ function formatMessage(text) {
         return '';  // 라벨 + URL 모두 제거 (카드로 대체)
     });
 
-    // 줄바꿈 및 빈 줄 정리
-    const cleanText = tempText
+    // 2단계: 불필요한 이모지 링크 마크다운 정리
+    textForMd = textForMd
         .replace(/🔗\s*/g, '')
-        .replace(/^\s*$/gm, '')           // 빈 줄 제거
+        .replace(/^\s*$/gm, '')
         .replace(/\n{3,}/g, '\n\n')
-        .replace(/\n/g, '<br>')
-        .replace(/(<br>){3,}/g, '<br><br>');
+        .trim();
 
-    // 카드 HTML - URL을 제목 옆에 표시
+    // 3단계: marked.js로 마크다운 변환
+    let formatted;
+    if (typeof marked !== 'undefined' && marked.parse) {
+        // marked 설정
+        marked.setOptions({
+            breaks: true,      // 줄바꿈을 <br>로 변환
+            gfm: true,         // GitHub Flavored Markdown
+            headerIds: false,
+            mangle: false,
+        });
+        formatted = marked.parse(textForMd);
+        // marked가 <p> 태그로 감싸므로, 최상위 불필요 <p> 정리
+        formatted = formatted.trim();
+    } else {
+        // marked.js 로드 실패 시 폴백
+        formatted = textForMd
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            .replace(/^- (.+)/gm, '• $1')
+            .replace(/\n/g, '<br>');
+    }
+
+    // 4단계: 카드 HTML
     let cardsHtml = '';
     if (linkCards.length > 0) {
         cardsHtml = `<div class="link-cards">` +
@@ -185,7 +199,7 @@ function formatMessage(text) {
             `</div>`;
     }
 
-    return cleanText + cardsHtml;
+    return formatted + cardsHtml;
 }
 
 function truncateUrl(url) {
@@ -206,71 +220,50 @@ function stripEmojis(text) {
     return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}\u{2328}\u{23CF}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}]/gu, '').replace(/\s{2,}/g, ' ').trim();
 }
 
-// 봇 메시지 복사 (화면에 보이는 대로 줄바꿈 유지)
+// 봇 메시지 복사 — "고객 전달용 답변" 영역만 추출하여 복사
 function copyBotMessage(btn) {
     const group = btn.closest('.message-group');
-    const bubble = group.querySelector('.bubble');
+    const rawText = group.getAttribute('data-raw-text') || '';
 
-    const clone = bubble.cloneNode(true);
-
-    // 링크 카드에서 URL 추출
-    const linkCards = clone.querySelectorAll('.link-card');
-    const urls = [];
-    linkCards.forEach(card => {
-        const name = card.querySelector('.link-card-name')?.textContent || '';
-        const url = card.getAttribute('href') || '';
-        if (url) urls.push(`${name}: ${url}`);
-        card.remove();
-    });
-    // FAQ 매칭 카드 제거
-    clone.querySelectorAll('.faq-match-card').forEach(el => el.remove());
-
-    // 인라인 링크 처리
-    clone.querySelectorAll('a').forEach(a => {
-        const href = a.getAttribute('href');
-        if (href && href.startsWith('http')) {
-            urls.push(href);
+    // "고객 전달용 답변" 영역만 추출 (내부 참고 메모 제외)
+    let customerText = rawText;
+    const customerMatch = rawText.match(/(?:📋\s*고객\s*전달용\s*답변[:\s]*)((?:.|\n)*?)(?=💡\s*내부\s*참고\s*메모|$)/i);
+    if (customerMatch) {
+        customerText = customerMatch[1].trim();
+    } else {
+        // 폴백: 내부 참고 메모 이후 제거
+        const memoIdx = rawText.indexOf('💡 내부 참고 메모');
+        if (memoIdx > 0) {
+            customerText = rawText.substring(0, memoIdx).trim();
         }
-    });
-
-    // HTML → 줄바꿈 보존 텍스트 변환
-    // <br> → 줄바꿈
-    clone.querySelectorAll('br').forEach(br => {
-        br.replaceWith(document.createTextNode('\n'));
-    });
-    // <p>, <div>, <li> 등 블록 요소 앞뒤에 줄바꿈 삽입
-    clone.querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6').forEach(el => {
-        el.prepend(document.createTextNode('\n'));
-        el.append(document.createTextNode('\n'));
-    });
-
-    let text = clone.textContent || '';
-    text = stripEmojis(text);
-    // 3줄 이상 연속 줄바꿈 → 2줄로 정리
-    text = text.replace(/\n{3,}/g, '\n\n').trim();
-
-    // 중복 URL 제거 후 링크 추가
-    const uniqueUrls = [...new Set(urls)];
-    if (uniqueUrls.length > 0) {
-        text += '\n\n' + uniqueUrls.join('\n');
+        // "고객 전달용 답변:" 헤더 자체도 제거
+        customerText = customerText.replace(/^📋\s*고객\s*전달용\s*답변[:\s]*/i, '').trim();
     }
 
-    navigator.clipboard.writeText(text).then(() => {
-        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> 복사됨';
+    // 마크다운 서식 정리 (** 볼드 등 제거)
+    customerText = customerText
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/^[\-\*]\s+/gm, '• ')
+        .replace(/^#+\s+/gm, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+    navigator.clipboard.writeText(customerText).then(() => {
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> 복사됨!';
         btn.classList.add('copied');
         setTimeout(() => {
-            btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> 복사';
+            btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> 📋 고객 전달용 복사';
             btn.classList.remove('copied');
         }, 2000);
     }).catch(() => {
         const ta = document.createElement('textarea');
-        ta.value = text;
+        ta.value = customerText;
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        btn.textContent = '복사됨';
-        setTimeout(() => { btn.textContent = '복사'; }, 2000);
+        btn.textContent = '복사됨!';
+        setTimeout(() => { btn.textContent = '📋 고객 전달용 복사'; }, 2000);
     });
 }
 
@@ -434,18 +427,11 @@ async function sendMessage() {
         typingEl.remove();
 
         let responseText = data.response || '오류가 발생했습니다.';
-        // 로봇 같은 인사말 제거
+        // 빈 링크/괄호 정리
         responseText = responseText
-            .replace(/^(안녕하세요[!.]?\s*(인팸|인팸의)?\s*(어시스턴트|AI)?[가-힣]*[!.\s]*)/i, '')
-            .replace(/^(반갑습니다[!.]?\s*)/i, '')
-            .replace(/^(안녕하세요[!]?\s*)/i, '')
-            .replace(/^(네[,!]?\s*안녕하세요[!.]?\s*)/i, '')
             .replace(/^(\s*\n)+/, '')
-            // 빈 링크/괄호 제거: [텍스트]() → 텍스트, 단독 () 제거
             .replace(/\[([^\]]+)\]\(\s*\)/g, '$1')
             .replace(/\(\s*\)/g, '')
-            // 문장 끝 마침표 뒤에 줄바꿈 추가 (가독성)
-            .replace(/(다|요|죠|세요|니다|습니다|겠습니다|드립니다|드릴게요|바랍니다|됩니다|있습니다|없습니다|됩니다|주세요|합니다|입니다|십시오|하세요|릅니다|옵니다)\.\s+/g, '$1.\n\n')
             .trim();
         const sourceBadge = getSourceBadge(data);
         const faqMatchHtml = getFAQMatchHtml(data.matchedFAQs) + getRAGSourceHtml(data.ragSources);
@@ -492,7 +478,7 @@ function addMessage(text, type, sourceBadge = '', faqMatchHtml = '', originalQue
         : `<div class="msg-avatar user">👤</div>`;
     const formattedText = formatMessage(text);
 
-    const copyBtnHtml = type === 'bot' ? `<button class="copy-msg-btn" onclick="copyBotMessage(this)" title="텍스트 복사"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> 복사</button>` : '';
+    const copyBtnHtml = type === 'bot' ? `<button class="copy-msg-btn" onclick="copyBotMessage(this)" title="고객 전달용 답변만 복사"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> 📋 고객 전달용 복사</button>` : '';
     const editBtnHtml = type === 'bot' ? `<button class="edit-msg-btn" onclick="editBotMessage(this)" title="답변 수정 후 학습">✏️ 바로수정</button>` : '';
 
     group.innerHTML = `
@@ -542,8 +528,8 @@ function clearChat() {
     welcome.id = 'welcomeSection';
     welcome.innerHTML = `
     <div class="welcome-logo"><img src="infam-logo.svg" alt="InFam" style="width: 50px; height: 50px; object-fit: contain;"></div>
-    <h2 class="welcome-title">안녕하세요! 👋</h2>
-    <p class="welcome-subtitle">인팸 AI 어시스턴트입니다.<br>제품, 배송, 시공 등 궁금한 점을 편하게 물어보세요!</p>
+    <h2 class="welcome-title">인팸 CS 어시스턴트 👋</h2>
+    <p class="welcome-subtitle">고객의 질문을 입력하면, 바로 전달 가능한 답변을 생성해 드립니다.<br>생성된 답변의 <strong>📋 고객 전달용 복사</strong> 버튼을 눌러 카카오톡/문자로 보내세요!</p>
     <div class="feature-chips">
       <div class="chip">🏠 벽장재 전문</div>
       <div class="chip">🚛 전국 배송</div>
@@ -551,7 +537,7 @@ function clearChat() {
       <div class="chip">⚡ 당일 배송 가능</div>
     </div>
     <div class="welcome-quick-questions">
-      <p class="welcome-suggest-title">자주 묻는 질문을 클릭해 보세요</p>
+      <p class="welcome-suggest-title">자주 들어오는 고객 질문을 클릭해 보세요</p>
       <div class="welcome-quick-btns">
         <button class="welcome-quick-btn" onclick="sendQuickMessage('제품 종류가 어떻게 되나요?')">🏠 제품 종류</button>
         <button class="welcome-quick-btn" onclick="sendQuickMessage('배송은 어떻게 진행되나요?')">🚛 배송 안내</button>
